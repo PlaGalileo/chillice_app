@@ -1,0 +1,93 @@
+{% block content %}
+<style>
+    body {
+        background: #f2f6fc;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Arial, sans-serif;
+    }
+
+    .login-box {
+        width: 100%;
+        max-width: 420px;
+        background: white;
+        padding: 40px;
+        border-radius: 18px;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+        text-align: center;
+    }
+
+    .login-box img {
+        max-width: 200px;
+        margin-bottom: 10px;
+    }
+
+    .login-box h1 {
+        color: #0A2463;
+        margin-bottom: 25px;
+        font-size: 1.8rem;
+        font-weight: 800;
+    }
+
+    .login-box input {
+        width: 100%;
+        padding: 14px;
+        margin-bottom: 18px;
+        font-size: 15px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        transition: border-color 0.3s ease;
+    }
+
+    .login-box input:focus {
+        outline: none;
+        border-color: #2C7DA0;
+    }
+
+    .login-box button {
+        width: 100%;
+        padding: 14px;
+        background-color: #2C7DA0;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .login-box button:hover {
+        background-color: #0A2463;
+    }
+
+    .error {
+        background-color: #ffe5e5;
+        border: 1px solid #cc0000;
+        color: #cc0000;
+        padding: 10px;
+        margin-bottom: 15px;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+</style>
+
+<div class="login-box">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Chill Ice">
+    <h1>Iniciar sesión en <strong> Producción CHILL ICE</strong></h1>
+
+    {% with mensajes = get_flashed_messages(category_filter=["error"]) %}
+    {% if mensajes %}
+        <div class="error">{{ mensajes[0] }}</div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="post">
+        <input type="text" name="matricula" placeholder="Matrícula (ej. CHILL000)" required>
+        <input type="password" name="password" placeholder="Contraseña" required>
+        <button type="submit">Entrar</button>
+    </form>
+</div>
+{% endblock %}

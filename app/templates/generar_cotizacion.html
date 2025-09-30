@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Generar Cotización{% endblock %}
+{% block content %}
+<style>
+  .vista-cotizacion {
+    max-width: 850px;
+    margin: 40px auto;
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  }
+
+  .vista-cotizacion h2 {
+    color: #0A2463;
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 1.9rem;
+  }
+
+  .vista-cotizacion .form-group {
+    margin-bottom: 25px;
+  }
+
+  .vista-cotizacion .form-group label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .vista-cotizacion .form-group input,
+  .vista-cotizacion .form-group select {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
+
+  .vista-cotizacion .producto {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 15px;
+    align-items: center;
+  }
+
+  .vista-cotizacion .producto input,
+  .vista-cotizacion .producto label {
+    flex: 1 1 100%;
+    padding: 12px;
+    font-size: 15px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+  }
+
+  @media (min-width: 768px) {
+    .vista-cotizacion .producto {
+      display: grid;
+      grid-template-columns: 3fr 1fr 1fr auto;
+    }
+
+    .vista-cotizacion .producto input,
+    .vista-cotizacion .producto label {
+      flex: unset;
+    }
+  }
+
+  .vista-cotizacion button,
+  .vista-cotizacion input[type="submit"] {
+    background-color: #2C7DA0;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 20px;
+    display: block;
+    width: 100%;
+  }
+
+  .vista-cotizacion button:hover,
+  .vista-cotizacion input[type="submit"]:hover {
+    background-color: #0A2463;
+  }
+
+  .vista-cotizacion .add-product-btn {
+    background-color: #89CFF0;
+    color: #0A2463;
+    font-weight: bold;
+    margin-top: 10px;
+    width: auto;
+  }
+
+  .vista-cotizacion .add-product-btn:hover {
+    background-color: #2C7DA0;
+    color: white;
+  }
+</style>
+
+<div class="vista-cotizacion">
+  <h2>📋 Generar Cotización</h2>
+
+  {% if nombre_excel %}
+    <div class="descarga" style="text-align:center; font-weight:bold; margin-bottom: 20px;">
+      ✅ Cotización generada.<br>
+      <a href="{{ url_for('cotizaciones.descargar_cotizacion', filename=nombre_excel) }}" download>📥 Descargar Excel</a>
+    </div>
+  {% endif %}
+
+  <form method="post">
+    <div class="form-group">
+      <label for="cliente_id">Cliente (ID o nombre):</label>
+      <input list="lista_clientes" name="cliente_id" id="cliente_id" placeholder="Ej. ICE001 - Abarrotes López" required>
+      <datalist id="lista_clientes">
+        {% for c in clientes %}
+          <option value="{{ c[0] }}">{{ c[1] }}</option>
+        {% endfor %}
+
+      </datalist>
+    </div>
+
+    <datalist id="lista_productos">
+      {% for id, nombre, descripcion, precio in productos_bd %}
+        <option value="{{ id }}">{{ descripcion }}</option>
+      {% endfor %}
+    </datalist>
+
+    <div id="productos">
+      <div class="producto">
+        <input list="lista_productos" name="id_producto1" placeholder="Producto" required>
+        <input type="number" name="cantidad1" placeholder="Cantidad" required>
+        <input type="number" step="0.01" name="precio_unitario1" placeholder="Precio unitario" required>
+        <label><input type="checkbox" name="aplica_iva1"> IVA</label>
+      </div>
+    </div>
+
+    <button type="button" class="add-product-btn" onclick="agregarProducto()">➕ Añadir producto</button>
+    <input type="submit" value="💾 Generar y Descargar Excel">
+  </form>
+</div>
+
+<script>
+  let contador = 1;
+  function agregarProducto() {
+    contador++;
+    const div = document.createElement('div');
+    div.classList.add('producto');
+    div.innerHTML = `
+      <input list="lista_productos" name="id_producto${contador}" placeholder="Producto" required>
+      <input type="number" name="cantidad${contador}" placeholder="Cantidad" required>
+      <input type="number" step="0.01" name="precio_unitario${contador}" placeholder="Precio unitario" required>
+      <label><input type="checkbox" name="aplica_iva${contador}"> IVA</label>
+    `;
+    document.getElementById('productos').appendChild(div);
+  }
+</script>
+{% endblock %}

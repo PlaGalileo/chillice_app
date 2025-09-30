@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Menú Principal{% endblock %}
+
+{% block content %}
+<style>
+    .menu-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        margin-top: 40px;
+    }
+
+    h2 {
+        font-size: 2rem;
+        color: #0A2463;
+        margin-bottom: 30px;
+    }
+
+    .menu-links {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 15px;
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .menu-links a {
+        display: block;
+        padding: 15px;
+        background-color: #2C7DA0;
+        color: white;
+        text-decoration: none;
+        font-size: 1rem;
+        border-radius: 10px;
+        transition: background-color 0.3s ease;
+    }
+
+    .menu-links a:hover {
+        background-color: #0A2463;
+    }
+</style>
+
+<div class="menu-container">
+    <h2>📋 Menú Principal</h2>
+    <div class="menu-links">
+        <a href="/lotes/registrar">📦 Registrar Lote</a>
+        <a href="/lotes/ver">🔍 Ver Lotes</a>
+        <a href="/clientes/registrar">👤 Registrar Cliente</a>
+        <a href="/clientes/ver">🔎 Ver Clientes</a>
+        <a href="/cotizacion/generar">📋 Generar Cotización</a>
+        <a href="/auth/logout">🔒 Cerrar sesión</a>
+    </div>
+</div>
+{% endblock %}
