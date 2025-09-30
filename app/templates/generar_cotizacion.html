@@ -128,31 +128,29 @@
       {% endfor %}
     </datalist>
 
+    <form method="post">
     <div id="productos">
       <div class="producto">
-        <input list="lista_productos" name="id_producto1" placeholder="Producto" required>
-        <input type="number" name="cantidad1" placeholder="Cantidad" required>
-        <input type="number" step="0.01" name="precio_unitario1" placeholder="Precio unitario" required>
-        <label><input type="checkbox" name="aplica_iva1"> IVA</label>
+        <input list="lista_productos" name="id_producto[]" placeholder="Producto" required>
+        <input type="number" name="cantidad[]" placeholder="Cantidad" required>
+        <input type="number" step="0.01" name="precio_unitario[]" placeholder="Precio unitario" required>
+        <label><input type="checkbox" name="aplica_iva[]"> IVA</label>
       </div>
     </div>
 
     <button type="button" class="add-product-btn" onclick="agregarProducto()">➕ Añadir producto</button>
-    <input type="submit" value="💾 Generar y Descargar Excel">
-  </form>
+    <input type="submit" value="💾 Registrar Cotización en Sistema"> </form>
 </div>
 
 <script>
-  let contador = 1;
   function agregarProducto() {
-    contador++;
     const div = document.createElement('div');
     div.classList.add('producto');
     div.innerHTML = `
-      <input list="lista_productos" name="id_producto${contador}" placeholder="Producto" required>
-      <input type="number" name="cantidad${contador}" placeholder="Cantidad" required>
-      <input type="number" step="0.01" name="precio_unitario${contador}" placeholder="Precio unitario" required>
-      <label><input type="checkbox" name="aplica_iva${contador}"> IVA</label>
+      <input list="lista_productos" name="id_producto[]" placeholder="Producto" required>
+      <input type="number" name="cantidad[]" placeholder="Cantidad" required>
+      <input type="number" step="0.01" name="precio_unitario[]" placeholder="Precio unitario" required>
+      <label><input type="checkbox" name="aplica_iva[]"> IVA</label>
     `;
     document.getElementById('productos').appendChild(div);
   }

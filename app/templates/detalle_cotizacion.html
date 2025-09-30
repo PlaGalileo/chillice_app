@@ -98,6 +98,7 @@
 
 <div class="detalle-container">
   <h3>🧾 COT-{{ "%05d"|format(cotizacion[0]) }}</h3>
+  
 
   <form method="post">
     <div class="form-grid">
@@ -190,7 +191,7 @@
           <td>${{ "%.2f"|format(p[3]) }}</td>  {# total #}
         </tr>
         {% endfor %}
-      </tbody>
+      </tbody>  
     </table>
     <div class="total-resumen">Total: ${{ "%.2f"|format(total) }}</div>
   </div>

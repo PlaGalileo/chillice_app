@@ -4,6 +4,13 @@ from datetime import date, timedelta, datetime
 from utils.db import conectar_bd
 import os
 from flask import send_from_directory, abort
+# Al principio de app/generar_cotizacion.py
+from openpyxl import load_workbook
+from openpyxl.drawing.image import Image
+import subprocess
+from utils.db import obtener_nombre_empleado
+import sys
+
 
 # Blueprint con el nombre que usan tus plantillas (cotizaciones)
 generar_cotizacion_bp = Blueprint("cotizaciones", __name__, url_prefix="/cotizaciones")
@@ -35,6 +42,8 @@ def existe_producto(cur, id_producto: str) -> bool:
 # ─────────────────────────────
 # Núcleo: registrar cotización
 # ─────────────────────────────
+# En app/generar_cotizacion.py
+
 def registrar_cotizacion(cliente_id: str, matricula: str, productos: list, *,
                          fecha: date | None = None,
                          dias_validez: int = 7,
@@ -52,7 +61,7 @@ def registrar_cotizacion(cliente_id: str, matricula: str, productos: list, *,
     cur = conn.cursor()
 
     try:
-        # Cabecera
+        # Cabecera (esto ya funciona bien)
         cur.execute("""
             INSERT INTO cotizaciones
                 (fecha, valido_hasta, cliente_id, atendido_por, notas,
@@ -70,36 +79,38 @@ def registrar_cotizacion(cliente_id: str, matricula: str, productos: list, *,
         ))
         id_cotizacion = cur.fetchone()[0]
 
-        # Detalle
+        # --- INICIA LA SECCIÓN CORREGIDA ---
+        # Detalle de la cotización
         for item in productos:
-            if isinstance(item, dict):
-                raw_id_producto  = item.get("id_producto")
-                descripcion      = item.get("descripcion", "")
-                cantidad         = int(item.get("cantidad", 0) or 0)
-                precio_unitario  = float(item.get("precio_unitario", 0) or 0.0)
-                total            = float(item.get("total", cantidad * precio_unitario))
-            else:
-                raw_id_producto, descripcion, cantidad, precio_unitario, total = item
-                cantidad = int(cantidad)
-                precio_unitario = float(precio_unitario)
-                total = float(total if total is not None else cantidad * precio_unitario)
+            # 1. Obtener datos del producto enviado desde el formulario
+            raw_id_producto = item.get("id_producto")
+            cantidad = int(item.get("cantidad", 0) or 0)
+            precio_unitario = float(item.get("precio_unitario", 0) or 0.0)
+            total = float(item.get("total", cantidad * precio_unitario))
 
+            # 2. Normalizar y validar el ID del producto
             id_producto = normalizar_id_producto(raw_id_producto)
             if not id_producto:
                 raise ValueError("Falta id_producto en un renglón del detalle.")
-
             if not existe_producto(cur, id_producto):
                 raise ValueError(
                     f"El producto '{raw_id_producto}' no existe (normalizado a '{id_producto}'). "
                     f"Crea el SKU en la tabla productos o corrige el ID."
                 )
 
+            # 3. ¡IMPORTANTE! Buscar la descripción correcta en la base de datos
+            cur.execute("SELECT descripcion FROM public.productos WHERE id_producto = %s", (id_producto,))
+            resultado_producto = cur.fetchone()
+            descripcion_correcta = resultado_producto[0] if resultado_producto else "Descripción no encontrada"
+
+            # 4. Insertar en la base de datos con TODOS los datos correctos
             cur.execute("""
                 INSERT INTO detalle_cotizacion
                     (id_cotizacion, id_producto, descripcion, cantidad, precio_unitario, total)
                 VALUES
                     (%s, %s, %s, %s, %s, %s)
-            """, (id_cotizacion, id_producto, descripcion, cantidad, precio_unitario, total))
+            """, (id_cotizacion, id_producto, descripcion_correcta, cantidad, precio_unitario, total))
+        # --- FIN DE LA SECCIÓN CORREGIDA ---
 
         conn.commit()
         return id_cotizacion
@@ -110,7 +121,6 @@ def registrar_cotizacion(cliente_id: str, matricula: str, productos: list, *,
     finally:
         cur.close()
         conn.close()
-
 # ─────────────────────────────
 # Descarga de archivos generados
 # ─────────────────────────────
@@ -131,75 +141,181 @@ def descargar_cotizacion(filename):
 # ─────────────────────────────
 # UI + API en el MISMO endpoint
 # ─────────────────────────────
+# En app/generar_cotizacion.py
+    
 @generar_cotizacion_bp.route("/generar", methods=["GET", "POST"])
 def generar_web():
-    # GET: muestra formulario web
-    if request.method == "GET":
-        return render_template("generar_cotizacion.html")
-
-    # POST: acepta JSON o formulario HTML
-    data = request.get_json(silent=True)
-
-    if not data:
-        # Formularios HTML (campos con [] en name)
-        cliente_id = (request.form.get("cliente_id") or "").strip()
-        matricula  = (request.form.get("matricula")  or session.get("usuario") or "").strip()
-
-        ids   = request.form.getlist("id_producto[]")
-        descs = request.form.getlist("descripcion[]")
-        cants = request.form.getlist("cantidad[]")
-        precios = request.form.getlist("precio_unitario[]")
-
-        productos = []
-        for i in range(len(ids)):
-            if not ids[i].strip():
-                continue
-            cantidad = int(cants[i] or 0)
-            pu = float(precios[i] or 0)
-            productos.append({
-                "id_producto": ids[i],
-                "descripcion": descs[i] if i < len(descs) else "",
-                "cantidad": cantidad,
-                "precio_unitario": pu,
-                "total": cantidad * pu
-            })
-
-        if not cliente_id:
-            return render_template("generar_cotizacion.html", error="cliente_id requerido"), 400
-        if not matricula:
-            return render_template("generar_cotizacion.html", error="matricula requerida"), 400
-        if not productos:
-            return render_template("generar_cotizacion.html", error="Agrega al menos un producto"), 400
-
+    conn = None  # Definimos conn aquí para que esté disponible en el finally
+    
+    # --- Función auxiliar para cargar datos ---
+    # Esto evita repetir código. Se llamará siempre que se renderice la página.
+    def render_form_with_data(error_message=None):
+        nonlocal conn
         try:
-            id_cot = registrar_cotizacion(cliente_id, matricula, productos)
-            # Redirige al detalle en tu módulo de gestión
-            return redirect(url_for("cotizaciones_gestion.detalle_cotizacion_unico", cotizacion_id=id_cot))
-        except ValueError as ve:
-            return render_template("generar_cotizacion.html", error=str(ve)), 400
-        except Exception:
-            return render_template("generar_cotizacion.html", error="Error al registrar la cotización"), 500
+            if not conn or conn.closed:
+                conn = conectar_bd()
+            cur = conn.cursor()
+            
+            # Consultar clientes
+            cur.execute("SELECT id_cliente, nombre FROM public.clientes ORDER BY id_cliente")
+            clientes = cur.fetchall()
+            
+            # Consultar productos
+            cur.execute("SELECT id_producto, nombre, descripcion, precio_sugerido FROM public.productos ORDER BY id_producto")
+            productos_bd = cur.fetchall()
 
-    # POST JSON (API)
-    cliente_id = (data.get("cliente_id") or "").strip()
-    matricula  = (data.get("matricula")  or session.get("usuario") or "").strip()
-    productos  = data.get("productos")
-
-    if not cliente_id:
-        return jsonify({"ok": False, "error": "cliente_id requerido"}), 400
-    if not matricula:
-        return jsonify({"ok": False, "error": "matricula (creado_por) requerida"}), 400
-    if not productos or not isinstance(productos, (list, tuple)):
-        return jsonify({"ok": False, "error": "productos debe ser una lista"}), 400
+            return render_template("generar_cotizacion.html", 
+                                   clientes=clientes, 
+                                   productos_bd=productos_bd, 
+                                   error=error_message)
+        except Exception as e:
+            # Si hay un error cargando datos, lo mostramos
+            return render_template("generar_cotizacion.html", 
+                                   clientes=[], 
+                                   productos_bd=[], 
+                                   error=f"Error al cargar datos: {e}")
 
     try:
-        id_cotizacion = registrar_cotizacion(cliente_id, matricula, productos)
-        return jsonify({"ok": True, "id_cotizacion": id_cotizacion})
-    except ValueError as ve:
-        return jsonify({"ok": False, "error": str(ve)}), 400
-    except Exception:
-        return jsonify({"ok": False, "error": "Error al registrar la cotización"}), 500
+        # --- Lógica para POST (cuando se envía el formulario) ---
+        if request.method == "POST":
+            cliente_id = (request.form.get("cliente_id") or "").strip()
+            matricula = (session.get("usuario") or "").strip()
+            ids = request.form.getlist("id_producto[]")
+            cants = request.form.getlist("cantidad[]")
+            precios = request.form.getlist("precio_unitario[]")
 
-# Aliases de compatibilidad
-gen_cotizacion_bp = generar_cotizacion_bp
-generar_cot_bp = generar_cotizacion_bp
+            # Validaciones
+            if not cliente_id:
+                return render_form_with_data(error_message="El ID del cliente es requerido.")
+            if not matricula:
+                return render_form_with_data(error_message="No se pudo identificar al usuario. Inicie sesión de nuevo.")
+            
+            productos = []
+            for i in range(len(ids)):
+                if ids[i].strip():
+                    cantidad = int(cants[i] or 0)
+                    pu = float(precios[i] or 0)
+                    productos.append({
+                        "id_producto": ids[i], "descripcion": "",
+                        "cantidad": cantidad, "precio_unitario": pu,
+                        "total": cantidad * pu
+                    })
+
+            if not productos:
+                return render_form_with_data(error_message="Debe agregar al menos un producto.")
+
+            # Si todo es válido, registrar y redirigir
+            id_cot = registrar_cotizacion(cliente_id, matricula, productos)
+            generar_archivo_cotizacion(id_cot) 
+            return redirect(url_for("ges_cotizaciones.detalle_cotizacion", id_cotizacion=id_cot))
+
+        # --- Lógica para GET (cuando se carga la página por primera vez) ---
+        return render_form_with_data()
+
+    except Exception as e:
+        # Error general durante el POST
+        return render_form_with_data(error_message=f"Error inesperado: {e}")
+    finally:
+        # Asegurarse de que la conexión se cierre
+        if conn and not conn.closed:
+            conn.close()
+
+# === PEGA ESTAS DOS FUNCIONES AL FINAL DE app/generar_cotizacion.py ===
+
+# Al final de app/generar_cotizacion.py
+
+def convertir_a_pdf(ruta_excel, carpeta_salida):
+    # --- LÓGICA PARA DETECTAR EL SISTEMA OPERATIVO ---
+    if sys.platform == "win32":
+        # Si es Windows, usa la ruta completa
+        ejecutable = r"C:\Program Files\LibreOffice\program\soffice.exe"
+    else:
+        # Si es Linux (o cualquier otro), usa el comando simple
+        ejecutable = "libreoffice"
+    # ----------------------------------------------------
+
+    comando = [
+        ejecutable, "--headless", "--convert-to", "pdf",
+        "--outdir", carpeta_salida, ruta_excel
+    ]
+    try:
+        subprocess.run(comando, check=True, capture_output=True, text=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"❌ Error al convertir a PDF. Asegúrate de que LibreOffice esté instalado y en el PATH (para Linux) o que la ruta sea correcta (para Windows). Error: {e}")
+        return False
+
+def generar_archivo_cotizacion(cotizacion_id):
+    """Toma una cotización de la BD y genera su archivo XLSX y PDF."""
+    conn = None
+    try:
+        conn = conectar_bd()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT c.fecha, c.valido_hasta, c.cliente_id, c.creado_por, cl.nombre, 
+                   cl.calle, cl.numero_exterior, cl.numero_interior, cl.colonia, cl.codigo_postal, 
+                   cl.municipio, cl.estado, cl.telefono, cl.correo, cl.rfc
+            FROM cotizaciones c
+            JOIN clientes cl ON c.cliente_id = cl.id_cliente
+            WHERE c.id_cotizacion = %s
+        """, (cotizacion_id,))
+        cot_data = cur.fetchone()
+        if not cot_data:
+            raise ValueError("No se encontró la cotización para generar el archivo.")
+
+        (fecha, valido_hasta, cliente_id, matricula, nombre_cliente, calle, num_ext, num_int, 
+         colonia, cp, municipio, estado, telefono, correo, rfc_cliente) = cot_data
+
+        cur.execute("SELECT descripcion, cantidad, precio_unitario, total FROM detalle_cotizacion WHERE id_cotizacion = %s", (cotizacion_id,))
+        productos = cur.fetchall()
+
+        base_dir = os.path.dirname(__file__)
+        plantilla_path = os.path.join(base_dir, 'plantilla_cotizacion.xlsx')
+        wb = load_workbook(plantilla_path)
+        ws = wb.active
+
+        ws['F3'] = fecha.strftime('%d/%m/%Y')
+        ws['F4'] = f"{cotizacion_id:05d}"
+        ws['F5'] = cliente_id
+        ws['F6'] = valido_hasta.strftime('%d/%m/%Y')
+        ws['A7'] = f"Le atiende: {obtener_nombre_empleado(matricula)}"
+        ws['A10'] = nombre_cliente
+        # ... (Llenado de datos del cliente y productos como en la versión anterior) ...
+
+        fila_inicio = 18
+        subtotal = 0
+        for i, (descripcion, cantidad, precio_unitario, total) in enumerate(productos):
+            fila = fila_inicio + i
+            ws[f'A{fila}'] = descripcion
+            ws[f'C{fila}'] = float(precio_unitario)
+            ws[f'D{fila}'] = int(cantidad)
+            ws[f'F{fila}'] = float(total)
+            subtotal += float(total)
+
+        ws['F30'] = subtotal
+        ws['F35'] = subtotal
+
+        # --- Insertar Logo ---
+        logo_path = os.path.join(base_dir, 'static', 'logo.png')
+        if os.path.exists(logo_path):
+            try:
+                img = Image(logo_path)
+                img.width = 60
+                img.height = 60
+                ws.add_image(img, "A1")
+            except Exception as e:
+                print(f"No se pudo agregar el logo a la cotización: {e}")
+
+        carpeta_salida = os.path.normpath(os.path.join(base_dir, '..', 'cotizaciones'))
+        os.makedirs(carpeta_salida, exist_ok=True)
+        nombre_archivo = f"cotizacion_{cliente_id}_{cotizacion_id:05d}.xlsx"
+        ruta_excel = os.path.join(carpeta_salida, nombre_archivo)
+        wb.save(ruta_excel)
+
+        convertir_a_pdf(ruta_excel, carpeta_salida)
+        return ruta_excel
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
