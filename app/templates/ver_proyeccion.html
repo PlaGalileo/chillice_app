@@ -1,213 +1,143 @@
 {% extends "base.html" %}
-{% block title %}Proyección de Producción{% endblock %}
+{% block title %}Dashboard de Producción{% endblock %}
 {% block content %}
 
 <style>
-  .proyeccion-container { max-width: 1040px; margin: 30px auto; background: #fff; padding: 28px 36px; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; }
-  h2 { color:#0A2463; text-align:center; margin-bottom:22px; font-weight:800; }
-  .form-fecha { display:flex; justify-content:center; gap:10px; margin-bottom:22px; }
-  .form-fecha input { padding:10px; border:1px solid #ccc; border-radius:8px; }
-  .btn { padding:10px 18px; border:none; border-radius:8px; cursor:pointer; font-weight:700; }
-  .btn-primary { background:#2C7DA0; color:#fff; }
-  .btn-primary:hover { background:#0A2463; }
-  .pedido-card { border:1px solid #DEE5ED; background:#F9FAFB; border-radius:12px; padding:16px; margin-bottom:12px; }
-  .pedido-head { display:flex; justify-content:space-between; color:#0A2463; font-weight:700; margin-bottom:8px; }
-  .pedido-head a { color:#2C7DA0; text-decoration:none; }
-  .pedido-head a:hover { color:#0A2463; }
-  .pedido-items { margin:6px 0 0 0; padding:0 0 0 18px; }
-  .resumen-box { margin-top:22px; background:#DEE5ED; color:#0A2463; border-radius:10px; padding:14px; text-align:center; font-weight:700; }
-  .alerta { margin-top:16px; background:#fdeaea; color:#8b0e0e; border:1px solid #f0b8b8; border-radius:10px; padding:14px; font-weight:700; }
-  .inventario-wrap { margin-top:26px; display:grid; grid-template-columns: 1fr; gap:18px; }
-  .panel { border:1px solid #E6EAF0; border-radius:12px; padding:16px; background:#fff; }
-  .panel h4 { color:#0A2463; margin:0 0 10px 0; }
-  table { width:100%; border-collapse:collapse; }
-  th, td { padding:10px; border-bottom:1px solid #EEE; text-align:left; }
-  th { background:#2C7DA0; color:#fff; }
-  .t-right { text-align:right; }
-
-  /* Estilos del carrusel */
-  .carousel { position: relative; max-width: 100%; overflow: hidden; border-radius: 12px; }
-  .carousel-container { display: flex; transition: transform 0.5s ease; }
-  .slide { min-width: 100%; box-sizing: border-box; text-align:center; }
-  .slide img { max-width:100%; border-radius:10px; border:1px solid #EEE; }
-
-  /* Botones */
-  .prev, .next {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    background: rgba(44, 125, 160, 0.85);
-    color: #fff;
-    border: none;
-    padding: 12px 16px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 20px;
-    font-weight: bold;
-    transition: background 0.3s, transform 0.2s;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  :root {
+    --chill-dark-blue: #0A2463; --chill-medium-blue: #2C7DA0; --chill-bg-light: #f8f9fa;
+    --chill-text-dark: #343a40; --chill-border-color: #dee2e6;
   }
-  .prev:hover, .next:hover {
-    background: #0A2463;
-    transform: translateY(-50%) scale(1.1);
+  .dashboard-container { font-family: "Segoe UI", system-ui, sans-serif; }
+  .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+  .header-flex h2 { color: var(--chill-dark-blue); margin: 0; }
+  .form-fecha { display: flex; gap: 0.5rem; align-items: center; }
+  .form-fecha input, .form-fecha .btn { padding: 0.6rem 1rem; border: 1px solid var(--chill-border-color); border-radius: 8px; font-size: 1rem; }
+  .btn-primary { background-color: var(--chill-medium-blue); color: white; cursor: pointer; border: none; }
+  
+  .kpi-controls { display: flex; gap: 0.5rem; }
+  .kpi-controls .control-btn {
+    background-color: var(--chill-bg-light); border: 1px solid var(--chill-border-color);
+    padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer;
+    color: var(--chill-medium-blue); transition: all 0.2s ease;
   }
-  .prev { left: 12px; }
-  .next { right: 12px; }
+  .kpi-controls .control-btn.active {
+    background-color: var(--chill-medium-blue); color: white; border-color: var(--chill-medium-blue);
+  }
+  
+  .dashboard-grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+  .card { background-color: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .card-title { color: var(--chill-dark-blue); font-size: 1.25rem; font-weight: 700; margin: 0 0 1.5rem 0; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+  .kpi-card { text-align: center; background-color: var(--chill-bg-light); padding: 1.5rem 1rem; border-radius: 10px; }
+  .kpi-card .value { font-size: 2.2rem; font-weight: 700; color: var(--chill-dark-blue); }
+  .kpi-card .label { font-size: 0.9rem; color: #6c757d; margin-top: 0.25rem; }
 
-  /* Puntos indicadores */
-  .dots { text-align:center; margin-top: 12px; }
-  .dot {
-    display: inline-block;
-    height: 12px; width: 12px;
-    margin: 0 4px;
-    background-color: #ccc;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  .dot.active { background-color: #2C7DA0; }
+  .pedido-card { background: var(--chill-bg-light); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+  .pedido-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 0.5rem; }
+  .pedido-head a { color: var(--chill-medium-blue); text-decoration: none; }
+  .pedido-items { list-style-type: none; padding-left: 1rem; color: #555; }
+  .badge { font-size: 0.8em; padding: 0.3em 0.8em; border-radius: 10px; color: white; font-weight: bold; }
+  .badge-nuevo { background-color: #6c757d; }
+  .badge-en-proceso { background-color: #ffc107; color: black; }
+  .badge-entregado { background-color: #28a745; }
+  
+  .graficas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .grafica-container { text-align: center; background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .grafica-container h4 { margin: 0 0 1rem 0; color: var(--chill-text-dark); }
+  .grafica-container img { max-width: 100%; border-radius: 8px; border: 1px solid var(--chill-border-color); }
+  @media (max-width: 900px) { .graficas-grid { grid-template-columns: 1fr; } }
 </style>
 
-<div class="proyeccion-container">
-  <h2>Proyección de Producción — {{ fecha }}</h2>
-
-  <form method="get" class="form-fecha">
-    <label style="font-weight:700; color:#0A2463;">Ver proyección para:</label>
-    <input type="date" name="fecha" value="{{ fecha }}">
-    <button type="submit" class="btn btn-primary">Buscar</button>
-  </form>
-
-  {% for pedido in pedidos %}
-  <div class="pedido-card">
-    <div class="pedido-head">
-      <a href="{{ url_for('ges_cotizaciones.detalle_cotizacion', id_cotizacion=pedido['id']) }}">
-        Pedido #{{ "%05d"|format(pedido['id']) }}
-      </a>
-      <span>{{ pedido['cliente'] }}</span>
-    </div>
-    <ul class="pedido-items">
-      {% for descripcion, cantidad in pedido['productos'] %}
-      <li>{{ cantidad }} × {{ descripcion }}</li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% endfor %}
-
-  <div class="resumen-box">
-    Total requerido: {{ resumen["5kg"] }} bolsas de 5kg,
-    {{ resumen["15kg"] }} de 15kg = <strong>{{ resumen["total_kg"] }} kg</strong>
+<div class="dashboard-container">
+  <div class="header-flex">
+    <h2>📊 Dashboard de Producción</h2>
+    <form method="get" class="form-fecha">
+      <label style="font-weight:700; color:var(--chill-text-dark);">Pedidos para el día:</label>
+      <input type="date" name="fecha" value="{{ fecha }}">
+      <button type="submit" class="btn-primary" style="border-radius: 8px; border: none;">Buscar</button>
+    </form>
   </div>
 
-  {% if faltan_5 > 0 or faltan_15 > 0 %}
-  <div class="alerta">
-    ⚠ Stock insuficiente para hoy:
-    {% if faltan_5 > 0 %} faltan {{ faltan_5 }} bolsas de 5kg.{% endif %}
-    {% if faltan_15 > 0 %} faltan {{ faltan_15 }} bolsas de 15kg.{% endif %}
-  </div>
-  {% endif %}
-
-  <div class="inventario-wrap">
-    <div class="panel">
-      <h4>Inventario actual</h4>
-      <p>Bolsas 5kg: <strong>{{ inventario["5kg"] }}</strong></p>
-      <p>Bolsas 15kg: <strong>{{ inventario["15kg"] }}</strong></p>
-      <p>Total disponible: <strong>{{ inventario["total_kg"] }} kg</strong></p>
-      <hr>
-      <p><strong>Entregado (mes actual):</strong> {{ bolsas5_entregadas }} bolsas de 5kg y {{ bolsas15_entregadas }} bolsas de 15kg</p>
-      <p><strong>Ingresos del mes: ${{ ingresos_mes }}</strong></p>
-    </div>
-
-    <div class="panel">
-      <h4 style="text-align:center;">Gráficas</h4>
-      <div class="carousel">
-        <button class="prev" onclick="mover(-1)">&#10094;</button>
-        
-        <div class="carousel-container">
-          <div class="slide">
-            <img id="grafica-mensual" alt="Inventario mensual (kg)">
-          </div>
-          <div class="slide">
-            <img id="grafica-diaria" alt="Producción diaria (kg)">
-          </div>
-          <div class="slide">
-            <img id="grafica-ingresos" alt="Ingresos últimos 12 meses">
-          </div>
+  <div class="dashboard-grid-top">
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 class="card-title">Indicadores Clave (KPIs)</h3>
+        <div class="kpi-controls">
+          <button id="btn-mensual" class="control-btn active">Mensual</button>
+          <button id="btn-historico" class="control-btn">Histórico</button>
         </div>
-        
-        <button class="next" onclick="mover(1)">&#10095;</button>
       </div>
-      <div class="dots">
-        <span class="dot" onclick="irA(0)"></span>
-        <span class="dot" onclick="irA(1)"></span>
-        <span class="dot" onclick="irA(2)"></span>
+      <div id="kpi-data-container" 
+           data-ingresos-mensual="${{ '%.2f'|format(kpis.mensual.ingresos) }}"
+           data-ingresos-historico="${{ '%.2f'|format(kpis.historico.ingresos) }}"
+           data-conversion-mensual="{{ kpis.mensual.conversion }}"
+           data-conversion-historico="{{ kpis.historico.conversion }}"
+           data-bolsas-mensual="{{ kpis.mensual.bolsas5 }} / {{ kpis.mensual.bolsas15 }}"
+           data-bolsas-historico="{{ kpis.historico.bolsas5 }} / {{ kpis.historico.bolsas15 }}">
+        <div class="kpi-grid">
+          <div class="kpi-card"><div id="kpi-ingresos" class="value">${{ '%.2f'|format(kpis.mensual.ingresos) }}</div><div class="label">Ingresos</div></div>
+          <div class="kpi-card"><div id="kpi-conversion" class="value">{{ kpis.mensual.conversion }}</div><div class="label">Tasa de Conversión</div></div>
+          <div class="kpi-card"><div id="kpi-bolsas" class="value">{{ kpis.mensual.bolsas5 }} / {{ kpis.mensual.bolsas15 }}</div><div class="label">Bolsas 5kg / 15kg Vendidas</div></div>
+          <div class="kpi-card"><div class="value">{{ kpis.stock_5kg }} / {{ kpis.stock_15kg }}</div><div class="label">Stock Actual 5kg / 15kg</div></div>
+        </div>
       </div>
     </div>
 
-    <div class="panel">
-      <h4>Desglose mensual (últimos 12)</h4>
-      <table>
-        <thead>
-          <tr>
-            <th>Mes</th>
-            <th class="t-right">Producido (kg)</th>
-            <th class="t-right">Entregado (kg)</th>
-            <th class="t-right">Inventario (kg)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in desglose_mensual %}
-          <tr>
-            <td>{{ row.mes }}</td>
-            <td class="t-right">{{ row.kg_producido }}</td>
-            <td class="t-right">{{ row.kg_entregado }}</td>
-            <td class="t-right"><strong>{{ row.kg_neto }}</strong></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="card">
+      <h3 class="card-title">Pedidos del Día ({{ fecha }})</h3>
+      {% if pedidos_hoy %}{% for pedido in pedidos_hoy %}
+        <div class="pedido-card">
+          <div class="pedido-head">
+            <a href="{{ url_for('ges_cotizaciones.detalle_cotizacion', id_cotizacion=pedido.id) }}">Pedido #{{ "%05d"|format(pedido.id) }}</a>
+            <div>
+              <span>{{ pedido.cliente }}</span>
+              <span class="badge badge-{{ pedido.estatus|replace(' ', '-')|lower }}">{{ pedido.estatus }}</span>
+            </div>
+          </div>
+          <ul class="pedido-items">
+            {% for descripcion, cantidad in pedido.productos %}
+            <li>{{ cantidad }} × {{ descripcion }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}{% else %}<p>No hay pedidos programados para esta fecha.</p>{% endif %}
+    </div>
+  </div>
+  
+  <div>
+    <h3 class="card-title" style="margin-left: 0.5rem; font-size: 1.5rem;">Análisis Visual</h3>
+    <div class="graficas-grid">
+      <div class="grafica-container"><h4>Producción vs. Entregas</h4><img src="{{ url_for('proyeccion.grafica_produccion_vs_entregas', _t=now().timestamp()) }}" alt="Gráfica de Producción vs Entregas"></div>
+      <div class="grafica-container"><h4>Ingresos Mensuales</h4><img src="{{ url_for('proyeccion.grafica_ingresos_mensuales', _t=now().timestamp()) }}" alt="Gráfica de Ingresos Mensuales"></div>
+      <div class="grafica-container"><h4>Top 5 Clientes</h4><img src="{{ url_for('proyeccion.grafica_top_clientes', _t=now().timestamp()) }}" alt="Gráfica de Top Clientes"></div>
+      <div class="grafica-container"><h4>Mix de Ingresos por Producto</h4><img src="{{ url_for('proyeccion.grafica_mix_productos', _t=now().timestamp()) }}" alt="Gráfica de Mix de Productos"></div>
     </div>
   </div>
 </div>
 
 <script>
-  let indice = 0;
-
-  function mostrarSlide(n) {
-    const slides = document.querySelector('.carousel-container');
-    const total = document.querySelectorAll('.slide').length;
-
-    if (n >= total) indice = 0;
-    else if (n < 0) indice = total - 1;
-    else indice = n;
-
-    slides.style.transform = `translateX(${-indice * 100}%)`;
-
-    // actualizar bolitas
-    const dots = document.querySelectorAll('.dot');
-    dots.forEach((dot, i) => dot.classList.toggle('active', i === indice));
-  }
-
-  function mover(dir) {
-    mostrarSlide(indice + dir);
-  }
-
-  function irA(n) {
-    mostrarSlide(n);
-  }
-
-  // Cargar gráficas dinámicamente
-  window.onload = function() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth()+1).padStart(2,'0');
-
-    document.getElementById('grafica-mensual').src =
-      `/proyeccion/grafica_inventario/${year}/${month}?ts=${Date.now()}`;
-    document.getElementById('grafica-diaria').src =
-      `/proyeccion/grafica_diaria/${year}/${month}?ts=${Date.now()}`;
-    document.getElementById('grafica-ingresos').src =
-      `/proyeccion/grafica_ingresos/${year}/${month}?ts=${Date.now()}`;
-
-    mostrarSlide(0);
-  };
+  document.addEventListener('DOMContentLoaded', function() {
+    const btnMensual = document.getElementById('btn-mensual');
+    const btnHistorico = document.getElementById('btn-historico');
+    const container = document.getElementById('kpi-data-container');
+    const kpiIngresosEl = document.getElementById('kpi-ingresos');
+    const kpiConversionEl = document.getElementById('kpi-conversion');
+    const kpiBolsasEl = document.getElementById('kpi-bolsas');
+    btnMensual.addEventListener('click', function() {
+      kpiIngresosEl.textContent = container.dataset.ingresosMensual;
+      kpiConversionEl.textContent = container.dataset.conversionMensual;
+      kpiBolsasEl.textContent = container.dataset.bolsasMensual;
+      btnMensual.classList.add('active');
+      btnHistorico.classList.remove('active');
+    });
+    btnHistorico.addEventListener('click', function() {
+      kpiIngresosEl.textContent = container.dataset.ingresosHistorico;
+      kpiConversionEl.textContent = container.dataset.conversionHistorico;
+      kpiBolsasEl.textContent = container.dataset.bolsasHistorico;
+      btnHistorico.classList.add('active');
+      btnMensual.classList.remove('active');
+    });
+  });
 </script>
 
 {% endblock %}

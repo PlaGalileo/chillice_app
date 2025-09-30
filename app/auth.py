@@ -1,17 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for, flash
 import psycopg2
 import bcrypt
+from utils.db import conectar_bd 
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
-
-def conectar_bd():
-    return psycopg2.connect(
-        dbname="chillice_db",
-        user="postgres",
-        password="Cocos121",
-        host="localhost",
-        port="5432"
-    )
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():

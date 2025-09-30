@@ -1,317 +1,249 @@
-# proyeccion.py
+# app/proyeccion.py
 from flask import Blueprint, render_template, request, session, redirect, url_for, Response
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from utils.db import conectar_bd
 import io
-
-# Matplotlib sin GUI
-import matplotlib
-matplotlib.use("Agg")
+import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.use("Agg")
 
 proyeccion_bp = Blueprint('proyeccion', __name__, url_prefix='/proyeccion')
 
-
-# ---------------------------
-# Helpers
-# ---------------------------
-def y_m_label(d: date) -> str:
-    return f"{d.year}-{str(d.month).zfill(2)}"
-
-def month_first_day(d: date) -> date:
-    return d.replace(day=1)
-
-def month_shift(d: date, delta_months: int) -> date:
-    y = d.year + (d.month - 1 + delta_months) // 12
-    m = (d.month - 1 + delta_months) % 12 + 1
-    return date(y, m, 1)
-
-
-# ---------------------------
-# Vista principal
-# ---------------------------
 @proyeccion_bp.route('/')
 def ver_proyeccion():
     if 'usuario' not in session:
         return redirect(url_for('auth.login'))
 
+    # Toma la fecha de la URL, si no existe, usa la fecha de hoy
     fecha_qs = request.args.get('fecha')
-    fecha = datetime.strptime(fecha_qs, '%Y-%m-%d').date() if fecha_qs else date.today()
+    fecha_filtrada = datetime.strptime(fecha_qs, '%Y-%m-%d').date() if fecha_qs else date.today()
 
     conn = conectar_bd()
-    cur = conn.cursor()
+    try:
+        # --- Pedidos del día ---
+        pedidos_query = """
+            SELECT c.id_cotizacion, cli.id_cliente, cli.nombre, d.descripcion, d.cantidad, c.estatus
+            FROM cotizaciones c
+            JOIN clientes cli ON cli.id_cliente = c.cliente_id
+            JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
+            WHERE c.fecha_entrega = %s AND c.tipo = 'Pedido' ORDER BY c.id_cotizacion
+        """
+        pedidos_df = pd.read_sql(pedidos_query, conn, params=(fecha_filtrada,))
+        pedidos_dict = {}
+        for _, row in pedidos_df.iterrows():
+            if row['id_cotizacion'] not in pedidos_dict:
+                pedidos_dict[row['id_cotizacion']] = {"id": row['id_cotizacion'], "cliente": f"{row['id_cliente']} - {row['nombre']}", "estatus": row['estatus'], "productos": []}
+            pedidos_dict[row['id_cotizacion']]['productos'].append((row['descripcion'], row['cantidad']))
+        pedidos_hoy = list(pedidos_dict.values())
 
-    # Pedidos del día seleccionado
-    cur.execute("""
-        SELECT c.id_cotizacion, cli.id_cliente, cli.nombre, d.descripcion, d.cantidad, c.fecha_entrega
-        FROM cotizaciones c
-        JOIN clientes cli ON cli.id_cliente = c.cliente_id
-        JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
-        WHERE c.fecha_entrega = %s AND c.tipo = 'Pedido'
-        ORDER BY c.id_cotizacion
-    """, (fecha,))
-    registros = cur.fetchall()
+        # --- KPIs (Mensual e Histórico) y Stock ---
+        # (Aquí va toda la lógica de consultas que ya corregimos)
+        kpis_mensual_query = """
+            SELECT
+                COALESCE(SUM(CASE WHEN d.id_producto = 'BR5KG' THEN d.cantidad ELSE 0 END), 0) AS bolsas5,
+                COALESCE(SUM(CASE WHEN d.id_producto = 'BR15KG' THEN d.cantidad ELSE 0 END), 0) AS bolsas15,
+                COALESCE(SUM(d.total), 0) AS ingresos
+            FROM cotizaciones c JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
+            WHERE c.tipo = 'Pedido' AND c.estatus = 'Entregado' AND DATE_TRUNC('month', c.fecha_entrega) = DATE_TRUNC('month', CURRENT_DATE)
+        """
+        kpis_mensual = pd.read_sql(kpis_mensual_query, conn).iloc[0]
+        tasa_mensual_query = "SELECT (SUM(CASE WHEN tipo = 'Pedido' THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*), 0)::float * 100) AS val FROM cotizaciones WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)"
+        tasa_mensual = (pd.read_sql(tasa_mensual_query, conn)['val'].iloc[0] or 0)
+        kpis_historico_query = """
+            SELECT
+                COALESCE(SUM(CASE WHEN d.id_producto = 'BR5KG' THEN d.cantidad ELSE 0 END), 0) AS bolsas5,
+                COALESCE(SUM(CASE WHEN d.id_producto = 'BR15KG' THEN d.cantidad ELSE 0 END), 0) AS bolsas15,
+                COALESCE(SUM(d.total), 0) AS ingresos
+            FROM cotizaciones c JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
+            WHERE c.tipo = 'Pedido' AND c.estatus = 'Entregado'
+        """
+        kpis_historico = pd.read_sql(kpis_historico_query, conn).iloc[0]
+        tasa_historica_query = "SELECT (SUM(CASE WHEN tipo = 'Pedido' THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*), 0)::float * 100) AS val FROM cotizaciones"
+        tasa_historica = (pd.read_sql(tasa_historica_query, conn)['val'].iloc[0] or 0)
+        inventario_df = pd.read_sql("""
+            SELECT 
+                (SELECT COALESCE(SUM(bolsas_5kg),0) FROM produccion_lotes) - 
+                (SELECT COALESCE(SUM(d.cantidad),0) FROM detalle_cotizacion d JOIN cotizaciones c ON d.id_cotizacion=c.id_cotizacion WHERE c.tipo='Pedido' AND c.estatus='Entregado' AND d.id_producto = 'BR5KG') 
+                AS stock_5kg,
+                
+                (SELECT COALESCE(SUM(bolsas_15kg),0) FROM produccion_lotes) - 
+                (SELECT COALESCE(SUM(d.cantidad),0) FROM detalle_cotizacion d JOIN cotizaciones c ON d.id_cotizacion=c.id_cotizacion WHERE c.tipo='Pedido' AND c.estatus='Entregado' AND d.id_producto = 'BR15KG') 
+                AS stock_15kg
+        """, conn)
+        inventario = inventario_df.iloc[0]
 
-    pedidos_dict = {}
-    resumen = {"5kg": 0, "15kg": 0, "total_kg": 0}
-    for id_cot, id_cliente, nombre, desc, cant, fecha_entrega in registros:
-        if id_cot not in pedidos_dict:
-            pedidos_dict[id_cot] = {
-                "id": id_cot,
-                "cliente": f"{id_cliente} - {nombre}",
-                "fecha_entrega": fecha_entrega.strftime("%Y-%m-%d") if fecha_entrega else "Sin definir",
-                "productos": []
-            }
-        pedidos_dict[id_cot]["productos"].append((desc, cant))
+    finally:
+        conn.close()
 
-        if "5 kilogramos" in desc and "15" not in desc:
-            resumen["5kg"] += cant
-            resumen["total_kg"] += cant * 5
-        elif "15 kilogramos" in desc:
-            resumen["15kg"] += cant
-            resumen["total_kg"] += cant * 15
-
-    pedidos = list(pedidos_dict.values())
-
-    # === Inventario (existencias reales) ===
-    # Producción acumulada histórica
-    cur.execute("""
-        SELECT COALESCE(SUM(bolsas_5kg),0), COALESCE(SUM(bolsas_15kg),0)
-        FROM produccion_lotes
-    """)
-    prod_5kg, prod_15kg = cur.fetchone()
-
-    # Entregado histórico (solo registros marcados como "Pedido")
-    cur.execute("""
-        SELECT 
-        COALESCE(SUM(CASE WHEN d.descripcion ILIKE '%%5 kilogramos%%'
-                            AND d.descripcion NOT ILIKE '%%15%%'
-                            THEN d.cantidad ELSE 0 END),0) AS bolsas5,
-        COALESCE(SUM(CASE WHEN d.descripcion ILIKE '%%15 kilogramos%%'
-                            THEN d.cantidad ELSE 0 END),0) AS bolsas15
-        FROM cotizaciones c
-        JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
-        WHERE c.tipo = 'Pedido'
-    """)
-    bolsas5_ent_total, bolsas15_ent_total = cur.fetchone()
-
-    stock_5  = max((prod_5kg  or 0) - (bolsas5_ent_total  or 0), 0)
-    stock_15 = max((prod_15kg or 0) - (bolsas15_ent_total or 0), 0)
-
-    inventario = {
-        "5kg": stock_5,
-        "15kg": stock_15,
-        "total_kg": stock_5 * 5 + stock_15 * 15
+    kpis_data = {
+        'mensual': { 'ingresos': kpis_mensual['ingresos'], 'bolsas5': kpis_mensual['bolsas5'], 'bolsas15': kpis_mensual['bolsas15'], 'conversion': f"{tasa_mensual:.1f}%" },
+        'historico': { 'ingresos': kpis_historico['ingresos'], 'bolsas5': kpis_historico['bolsas5'], 'bolsas15': kpis_historico['bolsas15'], 'conversion': f"{tasa_historica:.1f}%" },
+        'stock_5kg': inventario['stock_5kg'], 'stock_15kg': inventario['stock_15kg']
     }
 
-    # === Calcular faltantes (para alertas) ===
-    faltan_5 = max(0, resumen["5kg"] - inventario["5kg"])
-    faltan_15 = max(0, resumen["15kg"] - inventario["15kg"])
+    return render_template("ver_proyeccion.html", 
+                           fecha=fecha_filtrada.strftime('%Y-%m-%d'), 
+                           pedidos_hoy=pedidos_hoy, 
+                           kpis=kpis_data, 
+                           now=datetime.now)
+# --- RUTAS PARA LAS GRÁFICAS (API) ---
 
-    # === Entregado e ingresos del MES ACTUAL (panel informativo) ===
-    cur.execute("""
-        SELECT 
-          COALESCE(SUM(CASE WHEN d.descripcion ILIKE '%%5 kilogramos%%'
-                             AND d.descripcion NOT ILIKE '%%15%%'
-                            THEN d.cantidad ELSE 0 END),0) AS bolsas5_mes,
-          COALESCE(SUM(CASE WHEN d.descripcion ILIKE '%%15 kilogramos%%'
-                            THEN d.cantidad ELSE 0 END),0) AS bolsas15_mes,
-          COALESCE(SUM(d.total),0) AS ingresos_mes
-        FROM cotizaciones c
-        JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
-        WHERE c.tipo='Pedido' AND c.estatus='Entregado'
-          AND DATE_TRUNC('month', c.fecha) = DATE_TRUNC('month', %s::date)
-    """, (fecha,))
-    bolsas5_entregadas_mes, bolsas15_entregadas_mes, ingresos_mes = cur.fetchone()
+def crear_grafica(fig):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=90, bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    return Response(buf.getvalue(), mimetype="image/png")
 
-    # === Desglose mensual (últimos 12) ===
-    cur.execute("""
-        SELECT DATE_TRUNC('month', fecha_hora_registro)::date, SUM(total_kg)
+# --- ¡NUEVA GRÁFICA! ---
+# En app/proyeccion.py
+
+@proyeccion_bp.route('/grafica/produccion_vs_entregas')
+def grafica_produccion_vs_entregas():
+    conn = conectar_bd()
+    # Obtenemos la producción diaria del mes actual
+    produccion_df = pd.read_sql("""
+        SELECT EXTRACT(DAY FROM fecha_hora_registro)::int as dia, SUM(total_kg) as kg
         FROM produccion_lotes
-        GROUP BY 1 ORDER BY 1 DESC LIMIT 12
-    """)
-    prod_m = dict(cur.fetchall())
-
-    cur.execute("""
-        SELECT DATE_TRUNC('month', c.fecha)::date, 
-               SUM(CASE WHEN d.descripcion ILIKE '%%5 kilogramos%%' AND d.descripcion NOT ILIKE '%%15%%'
-                        THEN d.cantidad*5
-                        WHEN d.descripcion ILIKE '%%15 kilogramos%%'
-                        THEN d.cantidad*15 ELSE 0 END)
-        FROM cotizaciones c
-        JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
-        WHERE c.tipo='Pedido' AND c.estatus='Entregado'
-        GROUP BY 1 ORDER BY 1 DESC LIMIT 12
-    """)
-    entr_m = dict(cur.fetchall())
-
-    cur.close()
+        WHERE DATE_TRUNC('month', fecha_hora_registro) = DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+    """, conn)
+    
+    # Obtenemos las entregas diarias del mes actual
+    entregas_df = pd.read_sql("""
+        SELECT EXTRACT(DAY FROM c.fecha_entrega)::int as dia, 
+               SUM(CASE WHEN d.id_producto = 'BR5KG' THEN d.cantidad*5 
+                        WHEN d.id_producto = 'BR15KG' THEN d.cantidad*15 ELSE 0 END) as kg
+        FROM cotizaciones c JOIN detalle_cotizacion d ON c.id_cotizacion = d.id_cotizacion
+        WHERE c.tipo='Pedido' AND c.estatus='Entregado' 
+              AND DATE_TRUNC('month', c.fecha_entrega) = DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+    """, conn)
     conn.close()
 
-    meses = []
-    m0 = month_first_day(date.today())
-    for i in range(11, -1, -1):
-        m = month_shift(m0, -i)
-        producido = int(prod_m.get(m, 0) or 0)
-        entregado = int(entr_m.get(m, 0) or 0)
-        neto = producido - entregado
-        meses.append({
-            "mes": y_m_label(m),
-            "kg_producido": producido,
-            "kg_entregado": entregado,
-            "kg_neto": neto
-        })
+    # Combinamos ambos dataframes
+    df = pd.merge(produccion_df.rename(columns={'kg': 'Producción (kg)'}), 
+                  entregas_df.rename(columns={'kg': 'Entregas (kg)'}), 
+                  on='dia', how='outer').fillna(0)
+    
+    # Nos aseguramos de tener todos los días del mes
+    hoy = date.today()
+    ultimo_dia_mes = (date(hoy.year, hoy.month, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    dias_del_mes = pd.DataFrame({'dia': range(1, ultimo_dia_mes.day + 1)})
+    df = pd.merge(dias_del_mes, df, on='dia', how='left').fillna(0)
+    
+    # Preparamos los datos para una gráfica de barras agrupada
+    df_melted = df.melt(id_vars='dia', var_name='Tipo', value_name='Kilogramos')
 
-    return render_template(
-        "ver_proyeccion.html",
-        fecha=fecha.strftime('%Y-%m-%d'),
-        pedidos=pedidos,
-        resumen=resumen,
-        inventario=inventario,
-        bolsas5_entregadas=bolsas5_entregadas_mes,
-        bolsas15_entregadas=bolsas15_entregadas_mes,
-        ingresos_mes=ingresos_mes,
-        fecha_actual=date.today(),
-        desglose_mensual=meses,
-        faltan_5=faltan_5,
-        faltan_15=faltan_15
-    )
+    # --- Creación de la Gráfica ---
+    sns.set_theme(style="whitegrid")
+    fig, ax = plt.subplots(figsize=(10, 5)) # Hacemos la gráfica un poco más ancha
+    
+    sns.barplot(x='dia', y='Kilogramos', hue='Tipo', data=df_melted, 
+                palette={'Producción (kg)': '#2C7DA0', 'Entregas (kg)': '#FFC107'}, ax=ax)
+    
+    # Títulos y etiquetas
+    nombre_mes = hoy.strftime('%B %Y').capitalize()
+    ax.set_title(f"Producción vs. Entregas - {nombre_mes}", fontsize=14, fontweight="bold")
+    ax.set_ylabel("Kilogramos (kg)")
+    ax.set_xlabel("Día del Mes")
+    ax.legend(title="")
+    
+    return crear_grafica(fig)
+
+@proyeccion_bp.route('/grafica/ingresos_mensuales')
+def grafica_ingresos_mensuales():
+    conn = conectar_bd()
+    df = pd.read_sql("SELECT TO_CHAR(DATE_TRUNC('month', c.fecha), 'YYYY-MM') as mes, SUM(d.total) as ingresos FROM cotizaciones c JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion WHERE c.tipo='Pedido' AND c.estatus='Entregado' GROUP BY 1 ORDER BY 1 DESC LIMIT 12", conn)
+    conn.close()
+    if df.empty: return Response(status=204)
+    df = df.iloc[::-1]
+
+    sns.set_theme(style="whitegrid")
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.barplot(x='mes', y='ingresos', data=df, palette="viridis", ax=ax)
+    ax.set_title("Ingresos Mensuales", fontsize=14, fontweight="bold")
+    ax.set_ylabel("Ingresos ($)"); ax.set_xlabel("")
+    ax.tick_params(axis='x', rotation=45)
+    return crear_grafica(fig)
 
 
-# ---------------------------
-# Gráficas
-# ---------------------------
-@proyeccion_bp.route('/grafica_inventario/<int:year>/<int:month>')
-def grafica_inventario(year, month):
-    conn = conectar_bd(); cur = conn.cursor()
+@proyeccion_bp.route('/grafica/top_clientes')
+def grafica_top_clientes():
+    conn = conectar_bd()
+    df = pd.read_sql("SELECT cl.nombre, SUM(d.total) as total FROM cotizaciones c JOIN detalle_cotizacion d ON c.id_cotizacion = d.id_cotizacion JOIN clientes cl ON c.cliente_id = cl.id_cliente WHERE c.tipo = 'Pedido' AND c.estatus = 'Entregado' GROUP BY 1 ORDER BY 2 DESC LIMIT 5", conn)
+    conn.close()
+    if df.empty: return Response(status=204)
 
-    cur.execute("""
-        SELECT COALESCE(SUM(total_kg),0)
+    sns.set_theme(style="whitegrid")
+    fig, ax = plt.subplots(figsize=(7, 5)) # Tamaño ajustado
+    sns.barplot(y='nombre', x='total', data=df, palette="plasma", orient='h', ax=ax)
+    ax.set_title("Top 5 Clientes por Ingresos", fontsize=14, fontweight="bold")
+    ax.set_xlabel("Total Comprado ($)"); ax.set_ylabel("")
+    return crear_grafica(fig)
+
+# En app/proyeccion.py
+
+# En app/proyeccion.py
+
+@proyeccion_bp.route('/grafica/mix_productos')
+def grafica_mix_productos():
+    conn = conectar_bd()
+    # ESTA CONSULTA AHORA TAMBIÉN REVISA EL id_producto
+    df = pd.read_sql("""
+        SELECT 
+            CASE 
+                WHEN d.descripcion ILIKE '%%5 kilogramos%%' OR d.id_producto = 'BR5KG' THEN 'Bolsa 5kg'
+                WHEN d.descripcion ILIKE '%%15 kilogramos%%' OR d.id_producto = 'BR15KG' THEN 'Bolsa 15kg'
+                ELSE 'Otros'
+            END as producto,
+            SUM(d.total) as ingresos
+        FROM detalle_cotizacion d
+        JOIN cotizaciones c ON d.id_cotizacion = c.id_cotizacion
+        WHERE c.tipo = 'Pedido' AND c.estatus = 'Entregado'
+        GROUP BY 1
+    """, conn)
+    conn.close()
+    if df.empty: return Response(status=204)
+
+    # El resto del código para generar la imagen no cambia
+    fig, ax = plt.subplots(figsize=(7, 5))
+    colors = sns.color_palette('pastel')[0:len(df)]
+    ax.pie(df['ingresos'], labels=df['producto'], autopct='%.1f%%', startangle=90, colors=colors, 
+           wedgeprops={"edgecolor": "white", 'linewidth': 2})
+    ax.set_title("Mix de Ingresos por Producto", fontsize=14, fontweight="bold")
+    return crear_grafica(fig)
+
+# === ¡NUEVA GRÁFICA DE PRODUCCIÓN DIARIA! ===
+@proyeccion_bp.route('/grafica/produccion_diaria')
+def grafica_produccion_diaria():
+    conn = conectar_bd()
+    df = pd.read_sql("""
+        SELECT EXTRACT(DAY FROM fecha_hora_registro)::int as dia, SUM(total_kg) as total_kg
         FROM produccion_lotes
-        WHERE DATE_TRUNC('month', fecha_hora_registro) = %s
-    """, (date(year, month, 1),))
-    kg_prod = int(cur.fetchone()[0] or 0)
-
-    cur.execute("""
-        SELECT SUM(CASE WHEN d.descripcion ILIKE '%%5 kilogramos%%' AND d.descripcion NOT ILIKE '%%15%%'
-                        THEN d.cantidad*5
-                        WHEN d.descripcion ILIKE '%%15 kilogramos%%'
-                        THEN d.cantidad*15 ELSE 0 END)
-        FROM cotizaciones c
-        JOIN detalle_cotizacion d ON d.id_cotizacion = c.id_cotizacion
-        WHERE c.tipo='Pedido' AND c.estatus='Entregado'
-          AND DATE_TRUNC('month', c.fecha) = DATE_TRUNC('month', %s::date)
-    """, (date(year, month, 1),))
-    kg_ent = int(cur.fetchone()[0] or 0)
-
-    cur.close(); conn.close()
-
-    kg_neto = kg_prod - kg_ent
-    labels = ["Producido", "Entregado", "Inventario"]
-    values = [kg_prod, kg_ent, kg_neto]
-    colors = ["#2C7DA0", "#89CFF0", "#0A2463"]
-
-    fig, ax = plt.subplots(figsize=(6, 4))
-    bars = ax.bar(labels, values, color=colors, edgecolor="#333", linewidth=1.2)
-
-    # Números encima
-    for bar in bars:
-        yval = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2,
-                yval + (max(values) * 0.02),
-                f"{yval:,}", ha="center", va="bottom",
-                fontsize=11, fontweight="bold", color="#0A2463")
-
-    # Espacio extra arriba
-    ax.set_ylim(0, max(values) * 1.15)
-
-    ax.set_title(f"Inventario Mensual (kg) — {year}-{str(month).zfill(2)}",
-                 fontsize=13, fontweight="bold", color="#0A2463")
-    ax.set_ylabel("Producción (kg)", fontsize=11, color="#0A2463")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    buf = io.BytesIO(); plt.tight_layout(); fig.savefig(buf, format="png", dpi=120)
-    plt.close(fig); buf.seek(0)
-    return Response(buf.getvalue(), mimetype="image/png")
-
-@proyeccion_bp.route('/grafica_diaria/<int:year>/<int:month>')
-def grafica_diaria(year, month):
-    conn = conectar_bd(); cur = conn.cursor()
-    cur.execute("""
-        SELECT EXTRACT(DAY FROM fecha_hora_registro)::int, SUM(total_kg)
-        FROM produccion_lotes
-        WHERE DATE_TRUNC('month', fecha_hora_registro) = %s
+        WHERE DATE_TRUNC('month', fecha_hora_registro) = DATE_TRUNC('month', CURRENT_DATE)
         GROUP BY 1 ORDER BY 1
-    """, (date(year, month, 1),))
-    rows = cur.fetchall(); cur.close(); conn.close()
+    """, conn)
+    conn.close()
+    if df.empty: return Response(status=204)
 
-    dias = [r[0] for r in rows]; kg = [int(r[1]) for r in rows]
+    sns.set_theme(style="whitegrid")
+    fig, ax = plt.subplots(figsize=(7, 5)) # Tamaño ajustado
+    
+    # Dibuja la línea y el área
+    lineplot = sns.lineplot(x='dia', y='total_kg', data=df, marker='o', color=sns.color_palette("viridis")[3], ax=ax)
+    ax.fill_between(df['dia'], df['total_kg'], alpha=0.3, color=sns.color_palette("viridis")[3])
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(dias, kg, marker="o", markersize=8,
-            color="#0A2463", linewidth=2)
-    ax.fill_between(dias, kg, color="#2C7DA0", alpha=0.2)
+    # Agrega los números encima de cada punto
+    for index, row in df.iterrows():
+        ax.text(row['dia'], row['total_kg'] + df['total_kg'].max()*0.02, f"{row['total_kg']:.0f} kg", 
+                ha='center', va='bottom', fontsize=9, fontweight='bold')
 
-    # Números encima
-    if kg:
-        for x, y in zip(dias, kg):
-            ax.text(x, y + (max(kg) * 0.02),
-                    f"{y:,}", ha="center", va="bottom",
-                    fontsize=9, fontweight="bold", color="#0A2463")
-
-        # Espacio extra arriba
-        ax.set_ylim(0, max(kg) * 1.15)
-
-    ax.set_xticks(range(min(dias), max(dias)+1))  # enteros en eje X
-    ax.set_title(f"Producción Diaria (kg) — {year}-{str(month).zfill(2)}",
-                 fontsize=13, fontweight="bold", color="#0A2463")
-    ax.set_xlabel("Día del mes", fontsize=11, color="#0A2463")
-    ax.set_ylabel("Producción (kg)", fontsize=11, color="#0A2463")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    buf = io.BytesIO(); plt.tight_layout(); fig.savefig(buf, format="png", dpi=120)
-    plt.close(fig); buf.seek(0)
-    return Response(buf.getvalue(), mimetype="image/png")
-
-@proyeccion_bp.route('/grafica_ingresos/<int:year>/<int:month>')
-def grafica_ingresos(year, month):
-    conn = conectar_bd(); cur = conn.cursor()
-    cur.execute("""
-        SELECT DATE_TRUNC('month', c.fecha)::date, SUM(d.total)
-        FROM cotizaciones c
-        JOIN detalle_cotizacion d ON d.id_cotizacion=c.id_cotizacion
-        WHERE c.tipo='Pedido' AND c.estatus='Entregado'
-        GROUP BY 1 ORDER BY 1 LIMIT 12
-    """)
-    rows = cur.fetchall(); cur.close(); conn.close()
-
-    meses = [y_m_label(r[0]) for r in rows]
-    ingresos = [float(r[1]) for r in rows]
-
-    fig, ax = plt.subplots(figsize=(7, 4))
-    bars = ax.bar(meses, ingresos, color="#2C7DA0", edgecolor="#333")
-
-    # Números encima
-    if ingresos:
-        for bar in bars:
-            yval = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2,
-                    yval + (max(ingresos) * 0.02),
-                    f"${yval:,.0f}", ha="center", va="bottom",
-                    fontsize=9, fontweight="bold", color="#0A2463")
-
-        # Espacio extra arriba
-        ax.set_ylim(0, max(ingresos) * 1.15)
-
-    ax.set_title("Ingresos Últimos 12 Meses",
-                 fontsize=13, fontweight="bold", color="#0A2463")
-    ax.set_ylabel("Ingresos ($)", fontsize=11, color="#0A2463")
-    ax.set_xticklabels(meses, rotation=45, ha="right")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    buf = io.BytesIO(); plt.tight_layout(); fig.savefig(buf, format="png", dpi=120)
-    plt.close(fig); buf.seek(0)
-    return Response(buf.getvalue(), mimetype="image/png")
+    ax.set_title("Producción Diaria (Mes Actual)", fontsize=14, fontweight="bold")
+    ax.set_ylabel("Producción (kg)"); ax.set_xlabel("Día del Mes")
+    ax.set_ylim(0, df['total_kg'].max() * 1.18) # Espacio extra para los números
+    
+    return crear_grafica(fig)
