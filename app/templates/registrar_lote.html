@@ -29,14 +29,27 @@
           Hora actual: <strong>{{ now_str }}</strong>
       </p>
       <form method="post">
+          
+          <!-- MODIFICACIÓN INICIA: Añadir 1kg y 3kg -->
+          <div class="form-group">
+              <label for="bolsas_1kg">Cantidad de bolsas de 1kg:</label>
+              <input type="number" name="bolsas_1kg" id="bolsas_1kg" min="0" value="0">
+          </div>
+
+          <div class="form-group">
+              <label for="bolsas_3kg">Cantidad de bolsas de 3kg:</label>
+              <input type="number" name="bolsas_3kg" id="bolsas_3kg" min="0" value="0">
+          </div>
+          <!-- MODIFICACIÓN TERMINA -->
+
           <div class="form-group">
               <label for="bolsas_5kg">Cantidad de bolsas de 5kg:</label>
-              <input type="number" name="bolsas_5kg" id="bolsas_5kg" min="0">
+              <input type="number" name="bolsas_5kg" id="bolsas_5kg" min="0" value="0">
           </div>
 
           <div class="form-group">
               <label for="bolsas_15kg">Cantidad de bolsas de 15kg:</label>
-              <input type="number" name="bolsas_15kg" id="bolsas_15kg" min="0">
+              <input type="number" name="bolsas_15kg" id="bolsas_15kg" min="0" value="0">
           </div>
 
           <!-- Trazabilidad en segundos -->
@@ -51,7 +64,7 @@
           </div>
 
           <div class="form-group">
-              <label for="observaciones">Observaciones:</label>
+              <label for="observaciones">Observaciones (Importante: escribir "Diego" para su inventario):</label>
               <textarea name="observaciones" id="observaciones" rows="3"></textarea>
           </div>
 

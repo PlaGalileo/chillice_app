@@ -83,14 +83,19 @@
       </div>
 
       <div class="menu" id="menu-links">
-  <a href="{{ url_for('proyeccion.ver_proyeccion') }}"><i class="fa-solid fa-chart-line"></i><span class="text">Proyección</span></a>
+  <!-- MODIFICACIÓN: Actualizado a dashboard.dashboard -->
+  <a href="{{ url_for('dashboard.dashboard') }}"><i class="fa-solid fa-chart-line"></i><span class="text">Dashboard</span></a>
   <a href="{{ url_for('lotes.registrar_lote') }}"><i class="fa-solid fa-box"></i><span class="text">Registrar Lote</span></a>
   <a href="{{ url_for('lotes.ver_lotes') }}"><i class="fa-solid fa-cubes"></i><span class="text">Ver Lotes</span></a>
+  
+  <!-- NUEVO: Links de Merma -->
+  <a href="{{ url_for('mermas.registrar_merma') }}" style="color: #f8baba;"><i class="fa-solid fa-arrow-down-wide-short"></i><span class="text">Registrar Merma</span></a>
+  <a href="{{ url_for('mermas.ver_mermas') }}"><i class="fa-solid fa-chart-pie"></i><span class="text">Ver Mermas</span></a>
+  
   <a href="{{ url_for('cotizaciones.generar_web') }}"><i class="fa-solid fa-file-invoice"></i><span class="text">Cotizar</span></a>
   <a href="{{ url_for('ges_cotizaciones.ver_cotizaciones') }}"><i class="fa-solid fa-list"></i><span class="text">Ver Cotizaciones</span></a>
   <a href="{{ url_for('clientes.registrar_cliente') }}"><i class="fa-solid fa-user-plus"></i><span class="text">Registrar Cliente</span></a>
   <a href="{{ url_for('clientes.ver_clientes') }}"><i class="fa-solid fa-users"></i><span class="text">Ver Clientes</span></a>
-  <!-- En FA6 el viejo fa-sign-out-alt ahora es fa-right-from-bracket -->
   <a href="{{ url_for('auth.logout') }}"><i class="fa-solid fa-right-from-bracket"></i><span class="text">Salir</span></a>
 </div>
 

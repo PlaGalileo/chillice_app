@@ -10,7 +10,6 @@ def conectar_bd():
     else:
         # Asumimos que es Linux (tu servidor)
         password = "admin001"
-        
     try:
         return psycopg2.connect(
             dbname="chillice_db",

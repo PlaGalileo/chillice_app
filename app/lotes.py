@@ -44,9 +44,15 @@ def registrar_lote():
 
         id_lote = generar_id_lote()
 
-        bolsas_5kg = int(request.form['bolsas_5kg']) if request.form.get('bolsas_5kg') else 0
-        bolsas_15kg = int(request.form['bolsas_15kg']) if request.form.get('bolsas_15kg') else 0
-        total_kg = (bolsas_5kg * 5) + (bolsas_15kg * 15)
+        # --- MODIFICACIÓN INICIA ---
+        bolsas_1kg = int(request.form.get('bolsas_1kg') or 0)
+        bolsas_3kg = int(request.form.get('bolsas_3kg') or 0)
+        bolsas_5kg = int(request.form.get('bolsas_5kg') or 0)
+        bolsas_15kg = int(request.form.get('bolsas_15kg') or 0)
+        
+        total_kg = (bolsas_1kg * 1) + (bolsas_3kg * 3) + (bolsas_5kg * 5) + (bolsas_15kg * 15)
+        # --- MODIFICACIÓN TERMINA ---
+        
         observaciones = request.form.get('observaciones', '')
 
         # Tiempos en segundos (enteros, >= 0)
@@ -62,30 +68,30 @@ def registrar_lote():
 
         conn = conectar_bd()
         cur = conn.cursor()
+        
+        # --- MODIFICACIÓN INICIA ---
         cur.execute("""
             INSERT INTO public.produccion_lotes (
-                id_lote,
-                turno,
-                bolsas_5kg,
-                bolsas_15kg,
+                id_lote, turno,
+                bolsas_1kg, bolsas_3kg, bolsas_5kg, bolsas_15kg,
                 total_kg,
                 observaciones,
                 fecha_hora_registro,
                 tiempo_congelacion_s,
                 tiempo_defrost_s
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            id_lote,
-            turno,
-            bolsas_5kg,
-            bolsas_15kg,
+            id_lote, turno,
+            bolsas_1kg, bolsas_3kg, bolsas_5kg, bolsas_15kg,
             total_kg,
             observaciones,
             ahora,
             tiempo_congelacion_s,
             tiempo_defrost_s
         ))
+        # --- MODIFICACIÓN TERMINA ---
+        
         conn.commit()
         cur.close()
         conn.close()
@@ -115,26 +121,33 @@ def ver_lotes():
 
     conn = conectar_bd()
     cur = conn.cursor()
+    
+    # --- MODIFICACIÓN INICIA ---
     cur.execute("""
         SELECT
             id_lote,                -- 0
             fecha_hora_registro,    -- 1
             turno,                  -- 2
-            bolsas_5kg,             -- 3
-            bolsas_15kg,            -- 4
-            total_kg,               -- 5
-            tiempo_congelacion_s,   -- 6
-            tiempo_defrost_s,       -- 7
-            observaciones           -- 8
+            bolsas_1kg,             -- 3
+            bolsas_3kg,             -- 4
+            bolsas_5kg,             -- 5
+            bolsas_15kg,            -- 6
+            total_kg,               -- 7
+            tiempo_congelacion_s,   -- 8
+            tiempo_defrost_s,       -- 9
+            observaciones           -- 10
         FROM public.produccion_lotes
         WHERE DATE(fecha_hora_registro) = %s
         ORDER BY id_lote DESC
     """, (fecha_filtrada,))
     lotes = cur.fetchall()
 
-    total_5kg = sum([l[3] for l in lotes])
-    total_15kg = sum([l[4] for l in lotes])
-    total_kg = sum([l[5] for l in lotes])
+    total_1kg = sum([l[3] for l in lotes])
+    total_3kg = sum([l[4] for l in lotes])
+    total_5kg = sum([l[5] for l in lotes])
+    total_15kg = sum([l[6] for l in lotes])
+    total_kg = sum([l[7] for l in lotes])
+    # --- MODIFICACIÓN TERMINA ---
 
     cur.close()
     conn.close()
@@ -143,6 +156,10 @@ def ver_lotes():
         "ver_lotes.html",
         lotes=lotes,
         fecha=fecha_filtrada.strftime('%Y-%m-%d'),
+        # --- MODIFICACIÓN INICIA ---
+        total_1kg=total_1kg,
+        total_3kg=total_3kg,
+        # --- MODIFICACIÓN TERMINA ---
         total_5kg=total_5kg,
         total_15kg=total_15kg,
         total_kg=total_kg

@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}Dashboard de Operaciones{% endblock %}
+{% block content %}
+
+<style>
+  :root {
+    --chill-dark-blue: #0A2463; --chill-medium-blue: #2C7DA0; --chill-bg-light: #f8f9fa;
+    --chill-text-dark: #343a40; --chill-border-color: #dee2e6; --chill-diego-bg: #fffbf0;
+    --chill-diego-border: #ffeccc; --chill-merma-color: #d9534f;
+  }
+  .dashboard-container { font-family: "Segoe UI", system-ui, sans-serif; }
+  .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+  .header-flex h2 { color: var(--chill-dark-blue); margin: 0; }
+  
+  /* Formulario de Filtros (sin cambios) */
+  .form-filtros {
+    display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
+    background-color: #fff; padding: 1rem; border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 2rem;
+  }
+  .form-filtros label { font-weight: 700; color: var(--chill-text-dark); }
+  .form-filtros input, .form-filtros select, .form-filtros .btn { 
+    padding: 0.6rem 1rem; border: 1px solid var(--chill-border-color); 
+    border-radius: 8px; font-size: 1rem; 
+  }
+  .btn-primary { background-color: var(--chill-medium-blue); color: white; cursor: pointer; border: none; }
+  .filtro-pedidos { border-left: 2px solid var(--chill-border-color); padding-left: 1rem; }
+  
+  /* --- LAYOUT: GRID 2 COLUMNAS --- */
+  .dashboard-grid-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start; /* Alinear tarjetas arriba */
+  }
+  
+  .card { background-color: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .card-title { color: var(--chill-dark-blue); font-size: 1.25rem; font-weight: 700; margin: 0 0 1rem 0; }
+  
+  /* KPIs */
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .kpi-card { text-align: center; background-color: var(--chill-bg-light); padding: 1.2rem 1rem; border-radius: 10px; }
+  .kpi-card .value { font-size: 1.8rem; font-weight: 700; color: var(--chill-dark-blue); }
+  .kpi-card .label { font-size: 0.9rem; color: #6c757d; margin-top: 0.25rem; }
+  .kpi-card .value.merma { color: var(--chill-merma-color); }
+  
+  /* Grid 2x2 interno */
+  .data-grid-4 { 
+    display: grid; grid-template-columns: repeat(2, 1fr); 
+    gap: 1rem; text-align: center;
+  }
+  .data-item .value { font-size: 1.6rem; font-weight: 700; color: var(--chill-dark-blue); }
+  .data-item .label { font-size: 0.9rem; color: #6c757d; }
+  
+  /* Pedidos */
+  .card-pedidos {
+    /* Nueva lógica para igualar altura */
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Ocupa la altura disponible en su celda del grid */
+    min-height: 230px; /* Altura mínima para que coincida con los KPIs */
+  }
+  .card-pedidos .card-title { flex-shrink: 0; } /* El título no se encoge */
+  .pedidos-list-container {
+    flex-grow: 1; /* El contenedor de la lista de pedidos ocupa el espacio restante */
+    overflow-y: auto; /* Permite scroll si hay muchos pedidos */
+  }
+
+  .pedido-card { background: var(--chill-bg-light); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+  .pedido-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 0.5rem; }
+  .pedido-head a { color: var(--chill-medium-blue); text-decoration: none; }
+  .badge { font-size: 0.8em; padding: 0.3em 0.8em; border-radius: 10px; color: white; font-weight: bold; }
+  .badge-entregado { background-color: #28a745; }
+
+  /* --- SISTEMA DE PESTAÑAS (TABS) --- */
+  .card-tabs { padding: 0.5rem 1.5rem 1.5rem 1.5rem; }
+  .card-tabs input[type="radio"] { display: none; }
+  
+  .tab-nav {
+    display: flex;
+    flex-wrap: wrap; /* Permite que las pestañas bajen si no caben */
+    gap: 1rem;
+    border-bottom: 1px solid var(--chill-border-color);
+    margin-bottom: 1.5rem;
+  }
+  .tab-nav label {
+    padding: 0.75rem 0.25rem; /* Menos padding horizontal */
+    cursor: pointer;
+    font-weight: 600;
+    color: #6c757d;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    font-size: 0.9rem; /* Ligeramente más pequeño para 4 tabs */
+  }
+  .tab-nav label:hover { color: var(--chill-dark-blue); }
+
+  .tab-content { display: none; } /* Ocultar todo el contenido por defecto */
+
+  /* Lógica de Tabs (CSS-Only) */
+  .card-tabs input[type="radio"]:checked + label {
+    color: var(--chill-dark-blue);
+    border-bottom-color: var(--chill-medium-blue);
+  }
+  
+  /* IDs para el nuevo módulo de 4 pestañas */
+  #tab-stock-gen:checked ~ #content-stock-gen { display: block; }
+  #tab-prod-gen:checked ~ #content-prod-gen { display: block; }
+  #tab-ventas-tot:checked ~ #content-ventas-tot { display: block; }
+  #tab-precios-prom:checked ~ #content-precios-prom { display: block; }
+  
+  /* IDs para el módulo de Diego */
+  #tab-inv-diego:checked ~ #content-inv-diego { display: block; }
+  #tab-prod-diego:checked ~ #content-prod-diego { display: block; }
+  
+  /* Estilo especial Diego */
+  .card-diego-tabs { background-color: var(--chill-diego-bg); border: 1px solid var(--chill-diego-border); }
+  .card-diego-tabs .data-item .value { color: #d48806; }
+  .card-diego-tabs .data-item .label { color: #a16400; }
+  .card-diego-tabs .tab-nav input:checked + label { 
+    color: #a16400; border-bottom-color: #d48806; 
+  }
+  /* Ajuste de tamaño de fuente para pestañas de Diego (solo 2) */
+  .card-diego-tabs .tab-nav label { font-size: 1rem; }
+  
+  
+  /* --- SECCIÓN DE GRÁFICAS (AL FINAL) --- */
+  .graficas-section {
+    margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  .grafica-container { text-align: center; background-color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .grafica-container h4 { margin: 0 0 1rem 0; color: var(--chill-text-dark); }
+  .grafica-container img { max-width: 100%; border-radius: 8px; border: 1px solid var(--chill-border-color); }
+  
+  
+  /* Media Queries para Responsive */
+  @media (max-width: 1000px) { 
+    /* En tablet/móvil, apilar todo en 1 columna */
+    .dashboard-grid-main { grid-template-columns: 1fr; } 
+    .graficas-section { grid-template-columns: 1fr; }
+    .card-pedidos { min-height: auto; max-height: 400px; } /* Ajustar en móvil */
+  }
+
+</style>
+
+<div class="dashboard-container">
+  <div class="header-flex">
+    <h2>📊 Dashboard de Operaciones</h2>
+  </div>
+  <form method="get" class="form-filtros" id="dashboard-filters">
+    <div><label for="scope">Ver KPIs de:</label><select name="scope" id="scope"><option value="month" {% if scope == 'month' %}selected{% endif %}>Este Mes</option><option value="overall" {% if scope == 'overall' %}selected{% endif %}>Histórico (Overall)</option></select></div>
+    <div><label for="month">Mes:</label><input type="month" name="month" id="month" value="{{ month_selected }}"></div>
+    <div class="filtro-pedidos"><label for="fecha_pedidos">Ver Pedidos del día:</label><input type="date" name="fecha_pedidos" value="{{ fecha_pedidos }}"></div>
+    <button type="submit" class="btn-primary">Actualizar</button>
+  </form>
+
+  <div class="dashboard-grid-main">
+
+    <div class="card">
+      <h3 class="card-title">Indicadores Clave ({{ scope }})</h3>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="value">${{ "%.2f"|format(kpis_data.kpis.ingresos) }}</div><div class="label">Ingresos Totales</div></div>
+        <div class="kpi-card"><div class="value merma">{{ "%.1f"|format(kpis_data.kpis.merma_kg) }} kg</div><div class="label">Merma Total</div></div>
+        <div class="kpi-card"><div class="value">{{ "%.0f"|format(kpis_data.kpis.total_bolsas_vendidas) }}</div><div class="label">Bolsas Vendidas (Total)</div></div>
+        <div class="kpi-card">
+            <div class="value">${{ "%.2f"|format(kpis_data.kpis.precio_promedio_kg) }}</div>
+            <div class="label">Precio Promedio (KG)</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card card-pedidos">
+      <h3 class="card-title">Pedidos del Día ({{ fecha_pedidos }})</h3>
+      <div class="pedidos-list-container">
+        {% if pedidos_hoy %}{% for pedido in pedidos_hoy %}
+          <div class="pedido-card">
+            <div class="pedido-head">
+              <a href="{{ url_for('ges_cotizaciones.detalle_cotizacion', id_cotizacion=pedido.id) }}">Pedido #{{ "%05d"|format(pedido.id) }}</a>
+              <div>
+                <span>{{ pedido.cliente }}</span>
+                <span class="badge badge-{{ pedido.estatus|replace(' ', '-')|lower }}">{{ pedido.estatus }}</span>
+              </div>
+            </div>
+            <ul class="pedido-items">{% for descripcion, cantidad in pedido.productos %}<li>{{ cantidad }} × {{ descripcion }}</li>{% endfor %}</ul>
+          </div>
+        {% endfor %}{% else %}<p>No hay pedidos programados para esta fecha.</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="card card-tabs">
+      <input type="radio" id="tab-stock-gen" name="tabs-main" checked>
+      <input type="radio" id="tab-prod-gen" name="tabs-main">
+      <input type="radio" id="tab-ventas-tot" name="tabs-main">
+      <input type="radio" id="tab-precios-prom" name="tabs-main">
+      
+      <div class="tab-nav">
+        <label for="tab-stock-gen">Stock General</label>
+        <label for="tab-prod-gen">Producción General</label>
+        <label for="tab-ventas-tot">Ventas Totales</label>
+        <label for="tab-precios-prom">Precio Promedio</label>
+      </div>
+      
+      <div class="tab-content" id="content-stock-gen">
+        <div class="data-grid-4">
+          <div class="data-item"><div class="value">{{ kpis_data.stock_general['1'] }}</div><div class="label">1 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.stock_general['3'] }}</div><div class="label">3 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.stock_general['5'] }}</div><div class="label">5 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.stock_general['15'] }}</div><div class="label">15 kg</div></div>
+        </div>
+      </div>
+      <div class="tab-content" id="content-prod-gen">
+        <div class="data-grid-4">
+          <div class="data-item"><div class="value">{{ kpis_data.produccion_general['1'] }}</div><div class="label">1 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.produccion_general['3'] }}</div><div class="label">3 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.produccion_general['5'] }}</div><div class="label">5 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.produccion_general['15'] }}</div><div class="label">15 kg</div></div>
+        </div>
+      </div>
+      <div class="tab-content" id="content-ventas-tot">
+        <div class="data-grid-4">
+          <div class="data-item"><div class="value">{{ "%.0f"|format(kpis_data.ventas_por_tamano['1']) }}</div><div class="label">1 kg</div></div>
+          <div class="data-item"><div class="value">{{ "%.0f"|format(kpis_data.ventas_por_tamano['3']) }}</div><div class="label">3 kg</div></div>
+          <div class="data-item"><div class="value">{{ "%.0f"|format(kpis_data.ventas_por_tamano['5']) }}</div><div class="label">5 kg</div></div>
+          <div class="data-item"><div class="value">{{ "%.0f"|format(kpis_data.ventas_por_tamano['15']) }}</div><div class="label">15 kg</div></div>
+        </div>
+      </div>
+      <div class="tab-content" id="content-precios-prom">
+        <div class="data-grid-4">
+          <div class="data-item"><div class="value">${{ "%.2f"|format(kpis_data.precios_promedio_por_tamano['1'] ) }}</div><div class="label">1 kg</div></div>
+          <div class="data-item"><div class="value">${{ "%.2f"|format(kpis_data.precios_promedio_por_tamano['3'] ) }}</div><div class="label">3 kg</div></div>
+          <div class="data-item"><div class="value">${{ "%.2f"|format(kpis_data.precios_promedio_por_tamano['5'] ) }}</div><div class="label">5 kg</div></div>
+          <div class="data-item"><div class="value">${{ "%.2f"|format(kpis_data.precios_promedio_por_tamano['15']) }}</div><div class="label">15 kg</div></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card card-tabs card-diego-tabs">
+      <input type="radio" id="tab-inv-diego" name="tabs-diego" checked>
+      <input type="radio" id="tab-prod-diego" name="tabs-diego">
+      <div class="tab-nav">
+        <label for="tab-inv-diego">Inventario Diego</label>
+        <label for="tab-prod-diego">Producción Diego</label>
+      </div>
+      <div class="tab-content" id="content-inv-diego">
+        <div class="data-grid-4">
+          <div class="data-item"><div class="value">{{ kpis_data.stock_diego['1'] }}</div><div class="label">1 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.stock_diego['3'] }}</div><div class="label">3 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.stock_diego['5'] }}</div><div class="label">5 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.stock_diego['15'] }}</div><div class="label">15 kg</div></div>
+        </div>
+      </div>
+      <div class="tab-content" id="content-prod-diego">
+        <div class="data-grid-4">
+          <div class="data-item"><div class="value">{{ kpis_data.diego_produccion['1'] }}</div><div class="label">1 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.diego_produccion['3'] }}</div><div class="label">3 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.diego_produccion['5'] }}</div><div class="label">5 kg</div></div>
+          <div class="data-item"><div class="value">{{ kpis_data.diego_produccion['15'] }}</div><div class="label">15 kg</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div> <div class="graficas-section">
+    <div class="grafica-container"><h4>Ingresos Mensuales</h4><img src="{{ url_for('dashboard.grafica_ingresos_mensuales', _t=now().timestamp()) }}" alt="Gráfica de Ingresos Mensuales"></div>
+    <div class="grafica-container"><h4>Top 5 Clientes</h4><img src="{{ url_for('dashboard.grafica_top_clientes', _t=now().timestamp()) }}" alt="Gráfica de Top Clientes"></div>
+  </div>
+
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const scopeSelect = document.getElementById('scope');
+    const monthInput = document.getElementById('month');
+    
+    function toggleMonthInput() {
+      monthInput.disabled = (scopeSelect.value === 'overall');
+    }
+    
+    scopeSelect.addEventListener('change', toggleMonthInput);
+    toggleMonthInput();
+  });
+</script>
+
+{% endblock %}

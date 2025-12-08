@@ -75,6 +75,10 @@
         <th>ID Lote</th>
         <th>Fecha y hora</th>
         <th>Turno</th>
+        <!-- MODIFICACIÓN INICIA -->
+        <th>Bolsas 1kg</th>
+        <th>Bolsas 3kg</th>
+        <!-- MODIFICACIÓN TERMINA -->
         <th>Bolsas 5kg</th>
         <th>Bolsas 15kg</th>
         <th>Total (kg)</th>
@@ -89,18 +93,26 @@
         <td>{{ lote[0] }}</td>
         <td>{{ lote[1].strftime("%Y-%m-%d %H:%M:%S") }}</td>
         <td>{{ lote[2] }}</td>
-        <td>{{ lote[3] }}</td>
-        <td>{{ lote[4] }}</td>
-        <td>{{ lote[5] }}</td>
-        <td>{{ lote[6] }}</td>
-        <td>{{ lote[7] }}</td>
-        <td>{{ lote[8] or '' }}</td>
+        <!-- MODIFICACIÓN INICIA -->
+        <td>{{ lote[3] }}</td> <!-- 1kg -->
+        <td>{{ lote[4] }}</td> <!-- 3kg -->
+        <td>{{ lote[5] }}</td> <!-- 5kg -->
+        <td>{{ lote[6] }}</td> <!-- 15kg -->
+        <td>{{ lote[7] }}</td> <!-- total_kg -->
+        <td>{{ lote[8] }}</td> <!-- congelacion -->
+        <td>{{ lote[9] }}</td> <!-- defrost -->
+        <td style="max-width: 200px; overflow-wrap: break-word;">{{ lote[10] or '' }}</td> <!-- observaciones -->
+        <!-- MODIFICACIÓN TERMINA -->
       </tr>
       {% endfor %}
     </tbody>
     <tfoot>
       <tr>
         <td colspan="3">Totales</td>
+        <!-- MODIFICACIÓN INICIA -->
+        <td>{{ total_1kg }}</td>
+        <td>{{ total_3kg }}</td>
+        <!-- MODIFICACIÓN TERMINA -->
         <td>{{ total_5kg }}</td>
         <td>{{ total_15kg }}</td>
         <td>{{ total_kg }}</td>

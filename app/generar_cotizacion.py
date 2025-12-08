@@ -4,7 +4,6 @@ from datetime import date, timedelta, datetime
 from utils.db import conectar_bd
 import os
 from flask import send_from_directory, abort
-# Al principio de app/generar_cotizacion.py
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 import subprocess
@@ -18,16 +17,31 @@ generar_cotizacion_bp = Blueprint("cotizaciones", __name__, url_prefix="/cotizac
 # ─────────────────────────────
 # Normalización de productos
 # ─────────────────────────────
+# --- MODIFICACIÓN: Añadir SKUs 1kg y 3kg ---
+SKU_1KG  = "BR1KG"
+SKU_3KG  = "BR3KG"
 SKU_5KG  = "BR5KG"
 SKU_15KG = "BR15KG"
 
 ALIAS_A_SKU = {
+    # Aliases 1kg
+    "1": SKU_1KG, "1KG": SKU_1KG, "B1KG": SKU_1KG, "BOLSA 1": SKU_1KG, "BOLSA 1KG": SKU_1KG,
+    "1 KILOGRAMO": SKU_1KG, "BOLSA DE HIELO DE 1 KILOGRAMO": SKU_1KG,
+
+    # Aliases 3kg
+    "3": SKU_3KG, "3KG": SKU_3KG, "B3KG": SKU_3KG, "BOLSA 3": SKU_3KG, "BOLSA 3KG": SKU_3KG,
+    "3 KILOGRAMOS": SKU_3KG, "BOLSA DE HIELO DE 3 KILOGRAMOS": SKU_3KG,
+
+    # Aliases 5kg
     "5": SKU_5KG, "5KG": SKU_5KG, "B5KG": SKU_5KG, "BOLSA 5": SKU_5KG, "BOLSA 5KG": SKU_5KG,
     "5 KILOGRAMOS": SKU_5KG, "BOLSA DE HIELO DE 5 KILOGRAMOS": SKU_5KG,
 
+    # Aliases 15kg
     "15": SKU_15KG, "15KG": SKU_15KG, "B15KG": SKU_15KG, "BOLSA 15": SKU_15KG, "BOLSA 15KG": SKU_15KG,
     "15 KILOGRAMOS": SKU_15KG, "BOLSA DE HIELO DE 15 KILOGRAMOS": SKU_15KG,
 }
+# --- MODIFICACIÓN TERMINA ---
+
 
 def normalizar_id_producto(raw) -> str:
     if raw is None:
@@ -38,6 +52,12 @@ def normalizar_id_producto(raw) -> str:
 def existe_producto(cur, id_producto: str) -> bool:
     cur.execute("SELECT 1 FROM productos WHERE id_producto = %s", (id_producto,))
     return cur.fetchone() is not None
+
+# ... (El resto del archivo 'generar_cotizacion.py' (funciones registrar_cotizacion,
+# descargar_cotizacion, generar_web, convertir_a_pdf, generar_archivo_cotizacion)
+# no necesita más modificaciones, ya que la lógica de normalización actualizada
+# y la carga de productos desde la BD (que ya contiene 1kg y 3kg)
+# son suficientes para manejar los nuevos tamaños.)
 
 # ─────────────────────────────
 # Núcleo: registrar cotización
