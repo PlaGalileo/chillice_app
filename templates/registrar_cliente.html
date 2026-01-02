@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Registrar Cliente{% endblock %}
+
+{% block content %}
+<style>
+  .vista-cliente {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 30px 40px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  }
+ 
+  .alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: bold;
+  }
+
+  .vista-cliente h2 {
+    text-align: center;
+    color: #0A2463;
+    margin-bottom: 30px;
+    font-size: 2rem;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px 40px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-group label {
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #0A2463;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+  }
+
+  .form-group textarea {
+    resize: vertical;
+  }
+
+  .full-width {
+    grid-column: span 2;
+  }
+
+  .submit-btn {
+    margin-top: 30px;
+    text-align: center;
+  }
+
+  .submit-btn button {
+    background-color: #2C7DA0;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 30px;
+    font-size: 16px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+
+  .submit-btn button:hover {
+    background-color: #0A2463;
+  }
+</style>
+
+<div class="vista-cliente">
+  <h2>👤 Registrar Cliente</h2>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" role="alert" style="text-align:center; margin-bottom:20px;">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  <form method="post">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="categoria">Categoría:</label>
+        <select name="categoria" id="categoria" required>
+          <option value="Restaurante">Restaurante</option>
+          <option value="Abarrotes">Abarrotes</option>
+          <option value="Vinatería">Vinatería</option>
+          <option value="Evento">Evento</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="nombre">Nombre:</label>
+        <input type="text" name="nombre" id="nombre" required>
+      </div>
+
+      <div class="form-group">
+        <label for="telefono">Teléfono:</label>
+        <input type="text" name="telefono" id="telefono">
+      </div>
+
+      <div class="form-group">
+        <label for="correo">Correo:</label>
+        <input type="email" name="correo" id="correo">
+      </div>
+
+      <div class="form-group">
+        <label for="rfc">RFC:</label>
+        <input type="text" name="rfc" id="rfc">
+      </div>
+
+      <div class="form-group">
+        <label for="calle">Calle:</label>
+        <input type="text" name="calle" id="calle">
+      </div>
+
+      <div class="form-group">
+        <label for="numero_exterior">Número Exterior:</label>
+        <input type="text" name="numero_exterior" id="numero_exterior">
+      </div>
+
+      <div class="form-group">
+        <label for="numero_interior">Número Interior:</label>
+        <input type="text" name="numero_interior" id="numero_interior">
+      </div>
+
+      <div class="form-group">
+        <label for="colonia">Colonia:</label>
+        <input type="text" name="colonia" id="colonia">
+      </div>
+
+      <div class="form-group">
+        <label for="codigo_postal">Código Postal:</label>
+        <input type="text" name="codigo_postal" id="codigo_postal">
+      </div>
+
+      <div class="form-group">
+        <label for="municipio">Municipio:</label>
+        <input type="text" name="municipio" id="municipio">
+      </div>
+
+      <div class="form-group">
+        <label for="estado">Estado:</label>
+        <input type="text" name="estado" id="estado">
+      </div>
+
+      <div class="form-group full-width">
+        <label for="notas">Notas adicionales:</label>
+        <textarea name="notas" id="notas" rows="3"></textarea>
+      </div>
+    </div>
+
+    <div class="submit-btn">
+      <button type="submit">💾 Registrar Cliente</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

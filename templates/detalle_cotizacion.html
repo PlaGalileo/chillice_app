@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Detalle de Cotización{% endblock %}
+{% block content %}
+
+<style>
+  .detalle-container {
+    max-width: 900px;
+    margin: 40px auto;
+    background: white;
+    padding: 30px 40px;
+    border-radius: 16px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  }
+  .detalle-container h3 {
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.9rem;
+    margin-bottom: 30px;
+    color: #0A2463;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px 30px;
+    margin-bottom: 30px;
+  }
+  .form-group label {
+    display: block;
+    font-weight: bold;
+    color: #0A2463;
+    margin-bottom: 6px;
+  }
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+  }
+  .form-group input[readonly] { background-color: #f5f5f5; }
+
+  .btn-guardar {
+    display: block;
+    margin: 30px auto 20px auto;
+    background-color: #2C7DA0;
+    color: white;
+    padding: 14px 30px;
+    font-size: 16px;
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .btn-guardar:hover { background-color: #0A2463; }
+
+  .tabla-productos { margin-top: 30px; }
+  .tabla-productos h5 { margin-bottom: 15px; color: #0A2463; font-weight: bold; }
+  .tabla-productos table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.05);
+  }
+  .tabla-productos th { background-color: #2C7DA0; color: white; padding: 10px; text-align: left; }
+  .tabla-productos td { padding: 10px; border-bottom: 1px solid #ddd; }
+  .total-resumen { text-align: right; font-weight: bold; margin-top: 10px; font-size: 1.1rem; }
+
+  .volver { display: block; margin-top: 30px; text-align: center; }
+  .btn-success {
+    background-color: #28a745; color: white; font-weight: bold; padding: 12px 25px;
+    font-size: 16px; text-decoration: none; border-radius: 8px; display: inline-block;
+  }
+  .btn-success:hover { background-color: #218838; color: white; }
+
+  /* Botones CHILL ICE */
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    gap: 14px; justify-content: center; max-width: 520px;
+    margin: 24px auto 8px auto;
+  }
+  .btn { display: inline-block; text-align: center; padding: 12px 18px; border-radius: 10px;
+    font-weight: 600; font-size: 15px; border: 1px solid transparent; cursor: pointer;
+    transition: transform .02s ease, box-shadow .2s ease, background-color .2s ease, color .2s ease, border-color .2s ease;
+    user-select: none;
+  }
+  .btn-primary { background: #0A2463; color: #FFFFFF; border-color: #0A2463; }
+  .btn-primary:hover { background: #2C7DA0; border-color: #2C7DA0; }
+  .btn-secondary { background: #2C7DA0; color: #FFFFFF; border-color: #2C7DA0; }
+  .btn-secondary:hover { background: #0A2463; border-color: #0A2463; }
+  .btn-ghost { background: #DEE5ED; color: #0A2463; border-color: #DEE5ED; }
+  .btn-ghost:hover { background: #89CFF0; border-color: #89CFF0; }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus { outline: 3px solid #89CFF0; outline-offset: 2px; }
+  @media (max-width: 560px) { .actions { grid-template-columns: 1fr; } }
+</style>
+
+<div class="detalle-container">
+  <h3>🧾 COT-{{ "%05d"|format(cotizacion[0]) }}</h3>
+  
+
+  <form method="post">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Cliente:</label>
+        <input type="text" value="{{ cotizacion[3] }}" readonly>
+      </div>
+      <div class="form-group">
+        <label>Fecha de creación:</label>
+        <input type="text" value="{{ cotizacion[7] }}" readonly>
+      </div>
+
+      <div class="form-group">
+        <label>Válido hasta:</label>
+        <input type="text" value="{{ cotizacion[4] }}" readonly>
+      </div>
+
+      <div class="form-group">
+        <label>Tipo:</label>
+        <select name="tipo">
+          <option value="Cotización" {% if cotizacion[5] == 'Cotización' %}selected{% endif %}>Cotización</option>
+          <option value="Pedido" {% if cotizacion[5] == 'Pedido' %}selected{% endif %}>Pedido</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Estatus:</label>
+        <select name="estatus">
+          <option value="Nuevo" {% if cotizacion[6] == 'Nuevo' %}selected{% endif %}>Nuevo</option>
+          <option value="En proceso" {% if cotizacion[6] == 'En proceso' %}selected{% endif %}>En proceso</option>
+          <option value="Entregado" {% if cotizacion[6] == 'Entregado' %}selected{% endif %}>Entregado</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Fecha de entrega (en PEDIDOS):</label>
+        <input type="date" name="fecha_entrega" value="{{ fecha_entrega or '' }}">
+      </div>
+    </div>
+
+    <button type="submit" class="btn-guardar">💾 Guardar cambios</button>
+
+    {% set nombre_archivo = 'cotizacion_' ~ cotizacion[2] ~ '_' ~ "%05d"|format(cotizacion[0]) ~ '.xlsx' %}
+    {% set nombre_pdf = "cotizacion_" ~ cotizacion[2] ~ "_" ~ "%05d"|format(cotizacion[0]) ~ ".pdf" %}
+
+    <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;">
+      <a href="{{ url_for('cotizaciones.descargar_cotizacion', filename=nombre_archivo) }}"
+         class="btn btn-success" target="_blank" download>
+         Descargar XLSX
+      </a>
+
+      <a href="{{ url_for('cotizaciones.descargar_cotizacion', filename=nombre_pdf) }}"
+         class="btn btn-success" download>
+         Descargar PDF
+      </a>
+    </div>
+
+    {% if cotizacion[5] == 'Pedido' %}
+    <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;">
+      <a href="{{ url_for('nota_pedido.descargar_xlsx_pedido', cotizacion_id=cotizacion[0]) }}"
+         class="btn btn-success" target="_blank" download>
+        📄 Descargar Nota Pedido XLSX
+      </a>
+
+      <a href="{{ url_for('nota_pedido.descargar_pdf_pedido', cotizacion_id=cotizacion[0]) }}"
+         class="btn btn-success" download>
+        📄 Descargar Nota Pedido PDF
+      </a>
+    </div>
+    {% endif %}
+  </form>
+
+  <div class="tabla-productos">
+    <h5>📦 Productos</h5>
+    <table>
+      <thead>
+        <tr>
+          <th>Descripción</th>
+          <th>Cantidad</th>
+          <th>Precio Unitario</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in detalles %}
+        <tr>
+          <td>{{ p[0] }}</td>  {# descripcion #}
+          <td>{{ p[1] }}</td>  {# cantidad #}
+          <td>${{ "%.2f"|format(p[2]) }}</td>  {# precio_unitario #}
+          <td>${{ "%.2f"|format(p[3]) }}</td>  {# total #}
+        </tr>
+        {% endfor %}
+      </tbody>  
+    </table>
+    <div class="total-resumen">Total: ${{ "%.2f"|format(total) }}</div>
+  </div>
+
+  <div class="volver">
+    <a href="{{ url_for('ges_cotizaciones.ver_cotizaciones') }}" class="btn btn-secondary">← Volver</a>
+  </div>
+</div>
+
+{% endblock %}

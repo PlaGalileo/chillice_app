@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Clientes Registrados{% endblock %}
+{% block content %}
+
+<!-- Estilos DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<style>
+  .clientes-container {
+    max-width: 95%;
+    margin: 30px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    overflow-x: auto;
+  }
+
+  h2 {
+    text-align: center;
+    color: #0A2463;
+    margin-bottom: 25px;
+  }
+
+  table.dataTable thead {
+    background-color: #2C7DA0;
+    color: white;
+  }
+
+  table.dataTable tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+
+  table.dataTable tbody tr:hover {
+    background-color: #e6f2ff;
+  }
+
+  .dataTables_filter input,
+  .dataTables_length select {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    margin-left: 5px;
+  }
+
+  tfoot input {
+    width: 100%;
+    padding: 4px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+</style>
+
+<div class="clientes-container">
+  <h2>🔎 Clientes Registrados</h2>
+
+  <table id="tabla-clientes" class="display nowrap" style="width:100%">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Teléfono</th>
+        <th>Correo</th>
+        <th>CP</th>
+        <th>Municipio</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tfoot>
+      <tr>
+        <th><input type="text" placeholder="Buscar ID"></th>
+        <th><input type="text" placeholder="Buscar Nombre"></th>
+        <th><input type="text" placeholder="Buscar Teléfono"></th>
+        <th><input type="text" placeholder="Buscar Correo"></th>
+        <th><input type="text" placeholder="Buscar CP"></th>
+        <th><input type="text" placeholder="Buscar Municipio"></th>
+        <th><input type="text" placeholder="Buscar Estado"></th>
+      </tr>
+    </tfoot>
+    <tbody>
+      {% for c in clientes %}
+      <tr>
+        <td>{{ c[0] }}</td>
+        <td>{{ c[1] }}</td>
+        <td>{{ c[2] }}</td>
+        <td>{{ c[3] }}</td>
+        <td>{{ c[4] }}</td>
+        <td>{{ c[5] }}</td>
+        <td>{{ c[6] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<script>
+  $(document).ready(function () {
+    const tabla = $('#tabla-clientes').DataTable({
+      responsive: true,
+      language: {
+        lengthMenu: "Mostrar _MENU_ registros",
+        zeroRecords: "No se encontraron resultados",
+        info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+        infoEmpty: "Sin registros disponibles",
+        infoFiltered: "(filtrado de _MAX_ registros totales)",
+        search: "Buscar:",
+        paginate: {
+          first: "Primero",
+          last: "Último",
+          next: "Siguiente",
+          previous: "Anterior"
+        }
+      },
+      initComplete: function () {
+        this.api().columns().every(function () {
+          const column = this;
+          $('input', column.footer()).on('keyup change clear', function () {
+            if (column.search() !== this.value) {
+              column.search(this.value).draw();
+            }
+          });
+        });
+      }
+    });
+  });
+</script>
+
+{% endblock %}

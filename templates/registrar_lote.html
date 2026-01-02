@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Lote{% endblock %}
+
+{% block content %}
+<style>
+    .vista-lote .form-container {
+        max-width: 500px;
+        margin: 40px auto;
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 0 12px rgba(0,0,0,0.1);
+    }
+    .vista-lote h2 { text-align: center; color: #0A2463; margin-bottom: 20px; }
+    .vista-lote .form-group { margin-bottom: 20px; }
+    .vista-lote .form-group label { display: block; margin-bottom: 6px; font-weight: bold; }
+    .vista-lote .form-group input,
+    .vista-lote .form-group textarea { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; }
+    .vista-lote button { width: 100%; padding: 12px; background-color: #2C7DA0; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .vista-lote button:hover { background-color: #0A2463; }
+</style>
+
+<div class="vista-lote">
+  <div class="form-container">
+      <h2>📦 Registrar Lote</h2>
+      <p style="text-align:center;">
+          ID sugerido: <strong>{{ id_lote_mostrar }}</strong><br>
+          Hora actual: <strong>{{ now_str }}</strong>
+      </p>
+      <form method="post">
+          
+          <!-- MODIFICACIÓN INICIA: Añadir 1kg y 3kg -->
+          <div class="form-group">
+              <label for="bolsas_1kg">Cantidad de bolsas de 1kg:</label>
+              <input type="number" name="bolsas_1kg" id="bolsas_1kg" min="0" value="0">
+          </div>
+
+          <div class="form-group">
+              <label for="bolsas_3kg">Cantidad de bolsas de 3kg:</label>
+              <input type="number" name="bolsas_3kg" id="bolsas_3kg" min="0" value="0">
+          </div>
+          <!-- MODIFICACIÓN TERMINA -->
+
+          <div class="form-group">
+              <label for="bolsas_5kg">Cantidad de bolsas de 5kg:</label>
+              <input type="number" name="bolsas_5kg" id="bolsas_5kg" min="0" value="0">
+          </div>
+
+          <div class="form-group">
+              <label for="bolsas_15kg">Cantidad de bolsas de 15kg:</label>
+              <input type="number" name="bolsas_15kg" id="bolsas_15kg" min="0" value="0">
+          </div>
+
+          <!-- Trazabilidad en segundos -->
+          <div class="form-group">
+              <label for="tiempo_congelacion_s">Tiempo de congelación (segundos):</label>
+              <input type="number" name="tiempo_congelacion_s" id="tiempo_congelacion_s" min="0" step="1" placeholder="0">
+          </div>
+
+          <div class="form-group">
+              <label for="tiempo_defrost_s">Tiempo de descongelamiento (defrost) (segundos):</label>
+              <input type="number" name="tiempo_defrost_s" id="tiempo_defrost_s" min="0" step="1" placeholder="0">
+          </div>
+
+          <div class="form-group">
+              <label for="observaciones">Observaciones (Importante: escribir "Diego" para su inventario):</label>
+              <textarea name="observaciones" id="observaciones" rows="3"></textarea>
+          </div>
+
+          <button type="submit">Registrar</button>
+      </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Cotizaciones Registradas{% endblock %}
+{% block content %}
+
+<style>
+  .cotizaciones-container {
+    max-width: 95%;
+    margin: 30px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    overflow-x: auto;
+  }
+  h2 { text-align: center; color: #0A2463; margin-bottom: 20px; }
+
+  table.dataTable thead { background-color: #2C7DA0; color: white; }
+  table.dataTable tbody tr:nth-child(even) { background-color: #f8f9fa; }
+  table.dataTable tbody tr:hover { background-color: #e6f2ff; }
+
+  .dataTables_filter input, .dataTables_length select {
+    padding: 5px 10px; border-radius: 6px; border: 1px solid #ccc; margin-left: 5px;
+  }
+
+  .badge { font-size: 0.9em; padding: 6px 12px; border-radius: 12px; font-weight: bold; display: inline-block; }
+  .badge-pedido     { background-color: #0dcaf0; color: black; }
+  .badge-cotizacion { background-color: #6c757d; color: white; }
+  .badge-entregado  { background-color: #28a745; color: white; }
+  .badge-nuevo      { background-color: #89CFF0; color: white; }
+  .badge-proceso    { background-color: #ffc107; color: black; }
+
+  tfoot input { width: 100%; padding: 4px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; }
+</style>
+
+<div class="cotizaciones-container">
+  <h2>📋 Cotizaciones Registradas</h2>
+
+  <table id="tabla-cotizaciones" class="display nowrap" style="width:100%">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Fecha</th>
+        <th>Cliente</th>
+        <th>Válido hasta</th>
+        <th>Tipo</th>
+        <th>Estatus</th>
+      </tr>
+    </thead>
+    <tfoot>
+      <tr>
+        <th>ID</th>
+        <th>Fecha</th>
+        <th>Cliente</th>
+        <th>Válido hasta</th>
+        <th>Tipo</th>
+        <th>Estatus</th>
+      </tr>
+    </tfoot>
+    <tbody>
+      {% for c in cotizaciones %}
+      <tr>
+        <td><a href="{{ url_for('ges_cotizaciones.detalle_cotizacion', id_cotizacion=c[0]) }}">{{ c[0] }}</a></td>
+        <td>{{ c[1] }}</td>
+        <td>{{ c[2] }} - {{ c[3] }}</td>
+        <td>{{ c[4] }}</td>
+        <td>
+          <span class="badge {{ 'badge-pedido' if c[5] == 'Pedido' else 'badge-cotizacion' }}">{{ c[5] }}</span>
+        </td>
+        <td>
+          <span class="badge 
+            {% if c[6] == 'Entregado' %}badge-entregado
+            {% elif c[6] == 'En proceso' %}badge-proceso
+            {% else %}badge-nuevo{% endif %}">
+            {{ c[6] }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

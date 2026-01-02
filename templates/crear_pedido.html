@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Crear Pedido{% endblock %}
+{% block content %}
+
+<style>
+  .crear-container { max-width: 520px; margin: 50px auto; background:#fff; padding:26px 28px; border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,.08); }
+  h3 { text-align:center; color:#0A2463; font-weight:800; margin-bottom:18px; }
+  label { font-weight:700; color:#0A2463; display:block; margin-bottom:6px; }
+  input[type="date"] { width:100%; padding:12px; border:1px solid #ccc; border-radius:10px; }
+  .btn { width:100%; margin-top:16px; padding:12px 16px; border:none; border-radius:10px; font-weight:800; background:#2C7DA0; color:#fff; cursor:pointer; }
+  .btn:hover { background:#0A2463; }
+</style>
+
+<div class="crear-container">
+  <h3>🧾 Crear Pedido desde Cotización #{{ "%05d"|format(id_cotizacion) }}</h3>
+
+  <form method="post">
+    <label>Fecha de Entrega:</label>
+    <input type="date" name="fecha_entrega" required>
+    <button class="btn" type="submit">Crear Pedido</button>
+  </form>
+</div>
+
+{% endblock %}
